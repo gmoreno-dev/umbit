@@ -31,7 +31,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::mpsc;
 
 use crate::{
-    api::{self, Api, TokenSource, OAUTH_REDIRECT},
+    api::{self, Api, TokenSource, OAUTH_REDIRECT, WEB_SCOPES},
     config::Config,
     easter::{self, EggTracks},
     models::{Album, ClientConfig, ErrorEvent, NowPlaying, Page, Playlist, QueueView, SearchResults, SessionInfo, Track},
@@ -406,7 +406,7 @@ impl Core {
 
     // ---------- sessão ----------
 
-    async fn connect_with(self: Arc<Self>, creds: Credentials, from_cache: bool, oauth: Option<librespot::oauth::OAuthToken>) {
+    async fn connect_with(self: Arc<Self>, creds: Credentials, from_cache: bool, oauth: Option<(librespot::oauth::OAuthToken, String)>) {
         let _guard = self.login_lock.lock().await;
         self.update_info(|i| {
             i.connecting = true;
@@ -437,8 +437,8 @@ impl Core {
                 tauri::async_runtime::spawn(task);
                 *self.spirc.lock().unwrap() = Some(spirc);
                 let tokens = Arc::new(TokenSource::load(session.clone(), self.session_cfg.client_id.clone()));
-                if let Some(t) = oauth {
-                    tokens.store(&t);
+                if let Some((t, cid)) = oauth {
+                    tokens.store(&t, &cid);
                 }
                 *self.tokens.lock().unwrap() = Some(tokens.clone());
                 let api = Api::new(self.http.clone(), tokens);
@@ -479,32 +479,65 @@ impl Core {
         }
     }
 
-    pub async fn login(self: Arc<Self>) -> Result<(), String> {
-        if self.info.lock().unwrap().logged_in {
-            return Ok(());
-        }
-        let client = OAuthClientBuilder::new(&self.session_cfg.client_id, OAUTH_REDIRECT, OAUTH_SCOPES.to_vec())
+    async fn oauth(&self, client_id: &str, scopes: &[&str]) -> Result<librespot::oauth::OAuthToken, String> {
+        let client = OAuthClientBuilder::new(client_id, OAUTH_REDIRECT, scopes.to_vec())
             .open_in_browser()
             .with_custom_message(OAUTH_PAGE)
             .build()
             .map_err(|e| format!("oauth: {e}"))?;
+        client
+            .get_access_token_async()
+            .await
+            .map_err(|e| format!("autorização não concluída: {e}"))
+    }
+
+    pub async fn login(self: Arc<Self>) -> Result<(), String> {
+        if self.info.lock().unwrap().logged_in {
+            return Ok(());
+        }
+        let own_id = self.config.lock().unwrap().client_id.trim().to_string();
+        let shared_id = self.session_cfg.client_id.clone();
         self.update_info(|i| {
             i.connecting = true;
             i.error = None;
         });
-        let token = match client.get_access_token_async().await {
-            Ok(t) => t,
-            Err(e) => {
-                let msg = format!("autorização não concluída: {e}");
-                self.update_info(|i| {
-                    i.connecting = false;
-                    i.error = Some(msg.clone());
-                });
-                return Err(msg);
-            }
+
+        let fail = |me: &Self, msg: String| {
+            me.update_info(|i| {
+                i.connecting = false;
+                i.error = Some(msg.clone());
+            });
+            msg
         };
-        let creds = Credentials::with_access_token(token.access_token.clone());
-        self.clone().connect_with(creds, false, Some(token)).await;
+
+        if own_id.is_empty() {
+            // Só o client id compartilhado: um token para tudo.
+            let t = match self.oauth(&shared_id, OAUTH_SCOPES).await {
+                Ok(t) => t,
+                Err(e) => return Err(fail(&self, e)),
+            };
+            let creds = Credentials::with_access_token(t.access_token.clone());
+            self.clone().connect_with(creds, false, Some((t, shared_id))).await;
+        } else {
+            // 1. Token do seu app para a Web API (e, se o Spotify aceitar, para a sessão também).
+            let web = match self.oauth(&own_id, WEB_SCOPES).await {
+                Ok(t) => t,
+                Err(e) => return Err(fail(&self, e)),
+            };
+            let creds = Credentials::with_access_token(web.access_token.clone());
+            self.clone().connect_with(creds, false, Some((web.clone(), own_id.clone()))).await;
+            if !self.session_info().logged_in {
+                // 2. A sessão não aceitou o token do seu app: autoriza de novo com o id do librespot.
+                log::warn!("sessão recusou o token do client id próprio; tentando o compartilhado");
+                let t = match self.oauth(&shared_id, OAUTH_SCOPES).await {
+                    Ok(t) => t,
+                    Err(e) => return Err(fail(&self, e)),
+                };
+                let creds = Credentials::with_access_token(t.access_token.clone());
+                // Guarda o token da Web API do seu app, não o do librespot.
+                self.clone().connect_with(creds, false, Some((web, own_id))).await;
+            }
+        }
         let info = self.session_info();
         if info.logged_in {
             Ok(())

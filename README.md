@@ -68,6 +68,30 @@ npm run tauri dev      # roda em modo desenvolvimento
 npm run tauri build    # gera .deb e .AppImage em src-tauri/target/release/bundle
 ```
 
+## Seu próprio client id (necessário)
+
+A Web API do Spotify limita as chamadas por aplicação. O client id embutido
+no librespot é compartilhado por todo cliente não oficial do mundo e vive
+no limite, o que aparece como erro `429` na busca e na biblioteca. Por
+isso o Umbit usa um client id seu, como todo cliente open source faz.
+Leva dois minutos:
+
+1. Entre em [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
+   com a sua conta e clique em **Create app**.
+2. Nome e descrição livres. Em **Redirect URIs** coloque exatamente
+   `http://127.0.0.1:8898/login`. Em **APIs used** marque **Web API**.
+3. Salve, abra o app criado e copie o **Client ID**.
+4. Cole em `~/.config/umbit/config.toml`:
+
+   ```toml
+   client_id = "cole-aqui-o-seu-client-id"
+   ```
+
+5. No Umbit, `:sair` e entre de novo. O navegador pode pedir autorização
+   duas vezes na primeira vez: uma para o seu app (biblioteca e busca) e,
+   se o Spotify não aceitar esse token para tocar música, outra para o
+   motor de áudio.
+
 ## Configuração
 
 Fica em `~/.config/umbit/config.toml`. Credenciais e volume ficam em

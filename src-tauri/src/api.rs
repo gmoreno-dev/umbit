@@ -30,7 +30,23 @@ struct StoredOAuth {
     access_token: String,
     refresh_token: String,
     expires_at_unix: u64,
+    /// Client id com que o token foi emitido (o refresh precisa do mesmo).
+    #[serde(default)]
+    client_id: String,
 }
+
+/// Escopos pedidos no OAuth da Web API.
+pub const WEB_SCOPES: &[&str] = &[
+    "user-read-private",
+    "user-read-email",
+    "playlist-read-private",
+    "playlist-read-collaborative",
+    "user-library-read",
+    "user-top-read",
+    "streaming",
+    "user-read-playback-state",
+    "user-modify-playback-state",
+];
 
 fn unix_now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
@@ -56,12 +72,13 @@ impl TokenSource {
     }
 
     /// Guarda o token do OAuth (na memória e no disco) para as próximas execuções.
-    pub fn store(&self, t: &OAuthToken) {
+    pub fn store(&self, t: &OAuthToken, client_id: &str) {
         let ttl = t.expires_at.saturating_duration_since(Instant::now()).as_secs();
         let stored = StoredOAuth {
             access_token: t.access_token.clone(),
             refresh_token: t.refresh_token.clone(),
             expires_at_unix: unix_now() + ttl,
+            client_id: client_id.to_string(),
         };
         if let Ok(json) = serde_json::to_string(&stored) {
             let _ = fs::create_dir_all(paths::cache_dir());
@@ -91,11 +108,12 @@ impl TokenSource {
         }
         // 2. renovar pelo refresh token
         if let Some(o) = &current {
-            match OAuthClientBuilder::new(&self.client_id, OAUTH_REDIRECT, Vec::new()).build() {
+            let cid = if o.client_id.is_empty() { self.client_id.clone() } else { o.client_id.clone() };
+            match OAuthClientBuilder::new(&cid, OAUTH_REDIRECT, Vec::new()).build() {
                 Ok(client) => match client.refresh_token_async(&o.refresh_token).await {
                     Ok(t) => {
                         log::info!("token oauth renovado");
-                        self.store(&t);
+                        self.store(&t, &cid);
                         return Ok(t.access_token);
                     }
                     Err(e) => log::warn!("refresh do oauth falhou: {e}"),
@@ -174,6 +192,9 @@ impl Api {
                     .min(10);
                 tokio::time::sleep(Duration::from_secs(wait)).await;
                 continue;
+            }
+            if status.as_u16() == 429 {
+                return Err("spotify limitou o client id compartilhado (429). configure o seu próprio client_id em ~/.config/umbit/config.toml, veja o README".into());
             }
             if !status.is_success() {
                 let body = resp.text().await.unwrap_or_default();

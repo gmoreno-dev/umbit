@@ -16,6 +16,10 @@ pub struct Config {
     pub device_id: String,
     /// 96, 160 ou 320 kbps.
     pub bitrate: u16,
+    /// Client id de um app criado por você em developer.spotify.com. A Web API
+    /// limita por aplicação, e o id compartilhado do librespot vive no limite.
+    /// Vazio = usa o compartilhado.
+    pub client_id: String,
     pub easter_egg: EasterEggConfig,
 }
 
@@ -51,6 +55,7 @@ impl Default for Config {
             device_name: "Umbit".into(),
             device_id: String::new(),
             bitrate: 160,
+            client_id: String::new(),
             easter_egg: EasterEggConfig::default(),
         }
     }
