@@ -25,14 +25,50 @@ oficial. Abre em menos de um segundo.
 
 ## Instalar
 
-Por enquanto só Linux. Baixe o `.deb` ou o `.AppImage` da página de
-[releases](../../releases).
+Por enquanto só Linux (x86_64). Windows vem em seguida.
+
+### O jeito rápido (Debian, Ubuntu, Mint, Pop!_OS, Arch, Manjaro, EndeavourOS)
 
 ```bash
-sudo apt install ./umbit_*.deb
+curl -fsSL https://raw.githubusercontent.com/gmoreno-dev/umbit/main/install.sh | bash
 ```
 
-Windows e Mac vêm depois que a v1 estabilizar no Linux.
+O script descobre a sua distribuição, baixa a última
+[release](../../releases/latest) e instala. Vai pedir a senha do sudo uma vez.
+
+### Debian e Ubuntu, passo a passo
+
+1. Baixe o `.deb` da [última release](../../releases/latest) para uma pasta
+   que o sistema consiga ler, como `/tmp` (o apt recusa arquivos dentro de
+   uma home com permissão fechada).
+2. Instale:
+
+   ```bash
+   sudo apt install /tmp/Umbit_*_amd64.deb
+   ```
+
+3. Abra pelo menu ("Umbit") ou rode `umbit` no terminal.
+
+### Arch e derivados, passo a passo
+
+Pelo AppImage, sem compilar:
+
+1. Dependências: `sudo pacman -S --needed webkit2gtk-4.1 gtk3 alsa-lib openssl`
+2. Baixe o `.AppImage` da [última release](../../releases/latest), dê
+   permissão de execução (`chmod +x Umbit_*.AppImage`) e rode. Se der erro
+   de FUSE, extraia e rode direto: `./Umbit_*.AppImage --appimage-extract && ./squashfs-root/AppRun`.
+
+Compilando do código-fonte, com o PKGBUILD do repositório:
+
+```bash
+git clone https://github.com/gmoreno-dev/umbit.git
+cd umbit/packaging/arch
+makepkg -si
+```
+
+### Depois de instalar
+
+Crie o seu client id (seção abaixo) e entre com a sua conta Premium.
 
 ## Teclado
 

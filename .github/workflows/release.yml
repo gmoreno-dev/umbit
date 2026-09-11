@@ -31,5 +31,5 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "umbit ${{ github.ref_name }}"
           releaseBody: "Binários Linux (.deb e .AppImage). Precisa de Spotify Premium."
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false

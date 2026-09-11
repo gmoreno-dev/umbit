@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Umbit
+Comment=Cliente Spotify leve, não oficial, em 1 bit
+Exec=umbit
+Icon=umbit
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=spotify;música;music;player;
+StartupWMClass=umbit

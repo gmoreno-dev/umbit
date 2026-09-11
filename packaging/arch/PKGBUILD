@@ -1,0 +1,29 @@
+# Maintainer: gmoreno-dev
+# compila do código-fonte. para instalar sem compilar, use o install.sh do repositório.
+pkgname=umbit
+pkgver=0.1.4
+pkgrel=1
+pkgdesc="Cliente Spotify leve, não oficial, em 1 bit"
+arch=('x86_64')
+url="https://github.com/gmoreno-dev/umbit"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'alsa-lib' 'openssl')
+makedepends=('cargo' 'nodejs' 'npm' 'pkgconf')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "$pkgname-$pkgver"
+  npm ci
+  npm run build
+  cd src-tauri
+  cargo build --release --locked
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 src-tauri/target/release/umbit "$pkgdir/usr/bin/umbit"
+  install -Dm644 packaging/umbit.desktop "$pkgdir/usr/share/applications/umbit.desktop"
+  install -Dm644 src-tauri/icons/128x128.png "$pkgdir/usr/share/icons/hicolor/128x128/apps/umbit.png"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
