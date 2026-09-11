@@ -6,6 +6,7 @@ mod easter;
 mod models;
 mod mpris;
 mod paths;
+mod update;
 
 use std::sync::Arc;
 
@@ -19,6 +20,7 @@ pub fn run() {
     .init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // O librespot exige ser criado dentro de um runtime Tokio.
             let handle = app.handle().clone();
@@ -55,6 +57,8 @@ pub fn run() {
             commands::seek_relative,
             commands::set_volume,
             commands::get_cover,
+            commands::check_update,
+            commands::install_update,
         ])
         .build(tauri::generate_context!())
         .expect("erro ao iniciar o Umbit")

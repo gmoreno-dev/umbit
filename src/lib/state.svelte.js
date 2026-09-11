@@ -26,6 +26,7 @@ export const app = $state({
   paper: THEMES.papel[1],
   liviaUnlocked: false,
 
+  update: { info: null, installing: false }, // atualização encontrada na abertura
   toast: null, // { text, id }
   cmd: null, // string enquanto a linha de comando está aberta
 
@@ -242,6 +243,9 @@ export async function runCommand(line) {
     case 'sair':
       await logout();
       return;
+    case 'atualizar':
+      await checkUpdate(true);
+      return;
     case 'topo':
       try {
         const on = await api.toggleAlwaysOnTop();
@@ -294,4 +298,40 @@ export async function init() {
   ]);
 
   app.ready = true;
+
+  // uma verificação de atualização por abertura, alguns segundos depois de tudo carregar
+  setTimeout(() => checkUpdate(false), 4000);
+}
+
+// ---------- atualização ----------
+
+export const UPDATE_CMD = 'curl -fsSL https://raw.githubusercontent.com/gmoreno-dev/umbit/main/install.sh | bash';
+
+export async function checkUpdate(force) {
+  if (app.update.installing) return;
+  let info = null;
+  try {
+    info = await api.call('check_update', { force });
+  } catch (err) {
+    if (force) toast(errorText(err));
+    return;
+  }
+  if (!info) {
+    if (force) toast('já está na versão mais nova');
+    return;
+  }
+  app.update.info = info;
+  if (info.auto) {
+    toast(`nova versão ${info.version} · baixando…`);
+    app.update.installing = true;
+    try {
+      await api.call('install_update');
+    } catch (err) {
+      app.update.installing = false;
+      toast(errorText(err));
+    }
+  } else {
+    toast(`nova versão ${info.version} · :atualizar mostra como`);
+    if (force) setScreen('about');
+  }
 }

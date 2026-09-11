@@ -2,10 +2,11 @@
 
 use std::sync::Arc;
 
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::{
     core::Core,
+    update::{self, UpdateInfo},
     models::{Album, ClientConfig, NowPlaying, Page, Playlist, QueueView, SearchResults, SessionInfo, Track},
 };
 
@@ -153,4 +154,14 @@ pub fn set_volume(core: C, volume: u8) -> Result<(), String> {
 pub async fn get_cover(core: C<'_>, url: String) -> Result<tauri::ipc::Response, String> {
     let bytes = core.cover(&url).await?;
     Ok(tauri::ipc::Response::new(bytes.as_ref().clone()))
+}
+
+#[tauri::command]
+pub async fn check_update(app: AppHandle, force: Option<bool>) -> Result<Option<UpdateInfo>, String> {
+    update::check(&app, force.unwrap_or(false)).await
+}
+
+#[tauri::command]
+pub async fn install_update(app: AppHandle) -> Result<(), String> {
+    update::install(&app).await
 }

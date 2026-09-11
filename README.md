@@ -83,6 +83,18 @@ Linux, via MPRIS). Entra numa próxima versão.
 
 Crie o seu client id (seção abaixo) e entre com a sua conta Premium.
 
+## Atualizações
+
+O Umbit verifica se há versão nova ao abrir, no máximo uma vez por dia, com
+uma única requisição ao GitHub. Cada pacote é assinado; o app só instala o
+que confere com a chave pública embutida.
+
+- **Windows e AppImage**: baixa e instala sozinho, e reabre.
+- **`.deb` e binário em `/opt`** (instalação pelo script no Linux): esses
+  precisam de root, então o app avisa e mostra o comando para rodar no
+  terminal (o mesmo do instalador). `:sobre` mostra o estado, e
+  `:atualizar` força uma verificação.
+
 ## Teclado
 
 | tecla | ação |

@@ -372,6 +372,14 @@ const commands = {
     };
   },
 
+  async check_update({ force } = {}) {
+    // no navegador não há o que atualizar; `umbit.mock.update='1'` simula uma versão nova (manual)
+    if (ls.get('umbit.mock.update') === '1') return { version: '9.9.9', notes: null, auto: false };
+    return null;
+  },
+  async install_update() {
+    throw 'nesta instalação a atualização é manual';
+  },
   async set_client_id({ clientId }) {
     const id = String(clientId || '').trim();
     if (id && id.length !== 32) throw 'um client id tem 32 caracteres';

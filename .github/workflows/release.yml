@@ -27,7 +27,11 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
           tagName: ${{ github.ref_name }}
           releaseName: "umbit ${{ github.ref_name }}"
           releaseBody: "Linux (.deb, tarball, AppImage) e Windows 10/11 (instalador). Precisa de Spotify Premium."
@@ -66,7 +70,11 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
           tagName: ${{ github.ref_name }}
           releaseName: "umbit ${{ github.ref_name }}"
           releaseBody: "Linux (.deb, tarball, AppImage) e Windows 10/11 (instalador). Precisa de Spotify Premium."
