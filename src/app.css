@@ -1,0 +1,147 @@
+/* umbit · estilos globais: fontes locais, duas cores, reset mínimo */
+
+/* pixelify sans é uma fonte variável: um arquivo cobre 400 e 600 */
+@font-face {
+  font-family: 'Pixelify Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: block;
+  src: url('./assets/fonts/pixelify-sans-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('./assets/fonts/space-mono-400-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('./assets/fonts/space-mono-700-latin.woff2') format('woff2');
+}
+
+:root {
+  /* tema padrão "papel"; os outros são aplicados em tempo de execução */
+  --ink: #141210;
+  --paper: #f2efe6;
+  --mono: 'Space Mono', 'Courier New', monospace;
+  --pix: 'Pixelify Sans', 'Space Mono', monospace;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.4;
+  -webkit-font-smoothing: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+#app {
+  height: 100%;
+}
+
+/* botões viram caixas neutras: a aparência é sempre desenhada por nós */
+button {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0;
+}
+button:focus {
+  outline: none;
+}
+
+input {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  outline: none;
+  border-radius: 0;
+  -webkit-user-select: text;
+  user-select: text;
+}
+input::selection {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+svg {
+  display: block;
+}
+
+canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* listas roláveis sem barra de rolagem visível (o cursor sempre aparece) */
+.scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* fonte pixel para títulos, abas e rótulos */
+.pix {
+  font-family: var(--pix);
+}
+
+/* piscar de 1 bit (sem meio-termo) */
+@keyframes blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+.blink {
+  animation: blink 1s steps(1) infinite;
+}
+.blink-slow {
+  animation: blink 1.8s steps(1) infinite;
+}
