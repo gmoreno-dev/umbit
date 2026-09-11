@@ -104,6 +104,8 @@ pub struct QueueView {
 pub struct ClientConfig {
     pub theme: String,
     pub device_name: String,
+    /// Client id do app do usuário em developer.spotify.com (vazio = compartilhado).
+    pub client_id: String,
     pub egg_theme_ink: String,
     pub egg_theme_paper: String,
     pub version: String,

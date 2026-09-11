@@ -33,6 +33,8 @@ pub fn run() {
             commands::logout,
             commands::get_config,
             commands::set_theme,
+            commands::set_client_id,
+            commands::open_dashboard,
             commands::get_now_playing,
             commands::get_queue,
             commands::get_playlists,

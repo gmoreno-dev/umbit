@@ -5699,7 +5699,7 @@ dependencies = [
 
 [[package]]
 name = "umbit"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "chrono",
  "dirs 7.0.0",
@@ -5709,6 +5709,7 @@ dependencies = [
  "log",
  "lru",
  "mpris-server",
+ "open",
  "reqwest 0.13.5",
  "serde",
  "serde_json",

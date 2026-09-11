@@ -19,7 +19,7 @@ export const app = $state({
   session: { logged_in: false, connecting: false, username: '', display_name: '', easter_egg: false, birthday: false, error: null },
   now: { track: null, playing: false, loading: false, position_ms: 0, at_ms: 0, volume: 50, shuffle: false, repeat: false, active: false, egg: false },
   queue: { context_name: '', context_uri: null, current: null, current_index: 0, upcoming: [], total: 0, note: null },
-  config: { theme: 'papel', device_name: 'umbit', egg_theme_ink: '#5a1e3a', egg_theme_paper: '#f7e6ee', version: '0.1.0' },
+  config: { theme: 'papel', device_name: 'umbit', client_id: '', egg_theme_ink: '#5a1e3a', egg_theme_paper: '#f7e6ee', version: '0.1.0' },
 
   theme: 'papel',
   ink: THEMES.papel[0],
@@ -163,6 +163,8 @@ export async function login() {
   app.session.connecting = true;
   app.session.error = null;
   try {
+    // o client id digitado na tela de login vai para a configuração antes de entrar
+    await api.call('set_client_id', { clientId: app.config.client_id || '' });
     await api.call('login');
     // o núcleo normalmente emite "session"; confirma de qualquer jeito
     const s = await api.call('get_session');

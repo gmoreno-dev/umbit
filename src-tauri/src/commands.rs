@@ -37,6 +37,17 @@ pub fn set_theme(core: C, theme: String) {
 }
 
 #[tauri::command]
+pub fn set_client_id(core: C, client_id: String) -> Result<(), String> {
+    core.set_client_id(&client_id)
+}
+
+/// Abre o painel de desenvolvedor do Spotify no navegador. Só essa URL.
+#[tauri::command]
+pub fn open_dashboard() -> Result<(), String> {
+    open::that_detached("https://developer.spotify.com/dashboard").map_err(|e| format!("navegador: {e}"))
+}
+
+#[tauri::command]
 pub fn get_now_playing(core: C) -> NowPlaying {
     core.now_playing()
 }

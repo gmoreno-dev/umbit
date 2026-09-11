@@ -365,12 +365,21 @@ const commands = {
     return {
       theme: ls.get('umbit.mock.theme') || 'papel',
       device_name: 'umbit (mock)',
+      client_id: ls.get('umbit.mock.client_id') || '',
       egg_theme_ink: '#5a1e3a',
       egg_theme_paper: '#f7e6ee',
       version: '0.1.0',
     };
   },
 
+  async set_client_id({ clientId }) {
+    const id = String(clientId || '').trim();
+    if (id && id.length !== 32) throw 'um client id tem 32 caracteres';
+    ls.set('umbit.mock.client_id', id || null);
+  },
+  async open_dashboard() {
+    console.log('[mock] abriria https://developer.spotify.com/dashboard');
+  },
   async set_theme({ theme }) {
     ls.set('umbit.mock.theme', theme);
   },

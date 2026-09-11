@@ -1,7 +1,7 @@
 # Maintainer: gmoreno-dev
 # compila do código-fonte. para instalar sem compilar, use o install.sh do repositório.
 pkgname=umbit
-pkgver=0.1.5
+pkgver=0.1.6
 pkgrel=1
 pkgdesc="Cliente Spotify leve, não oficial, em 1 bit"
 arch=('x86_64')

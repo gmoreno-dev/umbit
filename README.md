@@ -117,16 +117,14 @@ Leva dois minutos:
 2. Nome e descrição livres. Em **Redirect URIs** coloque exatamente
    `http://127.0.0.1:8898/login`. Em **APIs used** marque **Web API**.
 3. Salve, abra o app criado e copie o **Client ID**.
-4. Cole em `~/.config/umbit/config.toml`:
+4. Cole no campo **client id** da tela de login do Umbit e entre. O
+   navegador pode pedir autorização duas vezes na primeira vez: uma para o
+   seu app (biblioteca e busca) e, se o Spotify não aceitar esse token para
+   tocar música, outra para o motor de áudio.
 
-   ```toml
-   client_id = "cole-aqui-o-seu-client-id"
-   ```
-
-5. No Umbit, `:sair` e entre de novo. O navegador pode pedir autorização
-   duas vezes na primeira vez: uma para o seu app (biblioteca e busca) e,
-   se o Spotify não aceitar esse token para tocar música, outra para o
-   motor de áudio.
+Para convidar até 5 pessoas sem que elas criem um app: no painel, em
+**User Management**, adicione o e-mail da conta Spotify delas, e elas usam
+o seu client id na tela de login.
 
 ## Configuração
 

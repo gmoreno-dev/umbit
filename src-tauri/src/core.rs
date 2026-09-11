@@ -311,6 +311,7 @@ impl Core {
         ClientConfig {
             theme: cfg.theme.clone(),
             device_name: cfg.device_name.clone(),
+            client_id: cfg.client_id.clone(),
             egg_theme_ink: cfg.easter_egg.theme_ink.clone(),
             egg_theme_paper: cfg.easter_egg.theme_paper.clone(),
             version: env!("CARGO_PKG_VERSION").to_string(),
@@ -321,6 +322,18 @@ impl Core {
         let mut cfg = self.config.lock().unwrap();
         cfg.theme = theme.to_string();
         cfg.save();
+    }
+
+    /// Guarda o client id digitado na tela de login (só letras e dígitos).
+    pub fn set_client_id(&self, client_id: &str) -> Result<(), String> {
+        let id: String = client_id.trim().chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+        if !id.is_empty() && id.len() != 32 {
+            return Err("um client id tem 32 caracteres".into());
+        }
+        let mut cfg = self.config.lock().unwrap();
+        cfg.client_id = id;
+        cfg.save();
+        Ok(())
     }
 
     fn egg_enabled(&self) -> bool {
