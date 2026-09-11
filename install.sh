@@ -4,13 +4,12 @@
 #   curl -fsSL https://raw.githubusercontent.com/gmoreno-dev/umbit/main/install.sh | bash
 #
 # debian/ubuntu: baixa o .deb da última release e instala com apt.
-# arch: instala as dependências com pacman, extrai o AppImage em /opt/umbit
-#       e cria o atalho no menu. nada de fuse, nada de aur.
+# outras distros (arch, fedora, opensuse, void...): instala o webkit do sistema
+#       pelo gerenciador de pacotes e o binário puro em /opt/umbit. sem AppImage.
 set -euo pipefail
 
 REPO="gmoreno-dev/umbit"
 API="https://api.github.com/repos/$REPO/releases/latest"
-RAW="https://raw.githubusercontent.com/$REPO/main"
 
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }
 die() { printf 'umbit: %s\n' "$*" >&2; exit 1; }
@@ -43,27 +42,35 @@ case "$family" in
     bold "instalando com apt (vai pedir a sua senha)"
     sudo apt install -y "$tmp/umbit.deb"
     ;;
-  *arch*|*manjaro*|*endeavouros*|*cachyos*|*garuda*)
-    url="$(asset '.AppImage')"; [ -n "$url" ] || die "a release $tag não tem AppImage"
-    bold "instalando dependências com pacman (vai pedir a sua senha)"
-    sudo pacman -S --needed --noconfirm webkit2gtk-4.1 gtk3 alsa-lib openssl
-    bold "baixando o AppImage"
-    curl -fL --progress-bar "$url" -o "$tmp/umbit.AppImage"
-    chmod +x "$tmp/umbit.AppImage"
-    bold "extraindo em /opt/umbit"
-    (cd "$tmp" && ./umbit.AppImage --appimage-extract >/dev/null)
+  *)
+    # qualquer outra distro (arch, fedora, opensuse, void...): binário puro com o webkit do sistema
+    url="$(asset 'linux-x86_64.tar.gz')"; [ -n "$url" ] || die "a release $tag não tem o tarball linux"
+    bold "instalando dependências (vai pedir a sua senha)"
+    if command -v pacman >/dev/null; then
+      sudo pacman -S --needed --noconfirm webkit2gtk-4.1 gtk3 alsa-lib openssl
+    elif command -v dnf >/dev/null; then
+      sudo dnf install -y webkit2gtk4.1 gtk3 alsa-lib openssl-libs
+    elif command -v zypper >/dev/null; then
+      sudo zypper --non-interactive install libwebkit2gtk-4_1-0 libgtk-3-0 libasound2 libopenssl3
+    elif command -v xbps-install >/dev/null; then
+      sudo xbps-install -Sy webkit2gtk41 gtk+3 alsa-lib openssl
+    else
+      echo "não reconheci o gerenciador de pacotes. instale: webkit2gtk 4.1, gtk3, alsa e openssl 3."
+    fi
+    bold "baixando o binário"
+    curl -fL --progress-bar "$url" -o "$tmp/umbit.tar.gz"
+    tar xzf "$tmp/umbit.tar.gz" -C "$tmp"
+    src="$(find "$tmp" -maxdepth 1 -type d -name 'umbit-*' | head -1)"
+    [ -n "$src" ] || die "tarball inesperado"
+    bold "instalando em /opt/umbit"
     sudo rm -rf /opt/umbit
     sudo mkdir -p /opt/umbit
-    sudo cp -r "$tmp/squashfs-root/." /opt/umbit/
-    sudo chmod -R a+rX /opt/umbit
-    sudo ln -sf /opt/umbit/AppRun /usr/local/bin/umbit
+    sudo cp "$src/umbit" "$src/umbit.png" "$src/LICENSE" /opt/umbit/
+    sudo chmod 755 /opt/umbit/umbit
+    sudo ln -sf /opt/umbit/umbit /usr/local/bin/umbit
     bold "criando o atalho no menu"
-    curl -fsSL "$RAW/packaging/umbit.desktop" | sudo tee /usr/share/applications/umbit.desktop >/dev/null
-    curl -fsSL "$RAW/src-tauri/icons/128x128.png" | sudo tee /usr/share/icons/hicolor/128x128/apps/umbit.png >/dev/null
-    command -v update-desktop-database >/dev/null && sudo update-desktop-database || true
-    ;;
-  *)
-    die "distribuição não suportada ainda: ${PRETTY_NAME:-$family}. baixe o AppImage em https://github.com/$REPO/releases"
+    sed 's|^Exec=umbit|Exec=/opt/umbit/umbit|; s|^Icon=umbit|Icon=/opt/umbit/umbit.png|' "$src/umbit.desktop" | sudo tee /usr/share/applications/umbit.desktop >/dev/null
+    command -v update-desktop-database >/dev/null && sudo update-desktop-database 2>/dev/null || true
     ;;
 esac
 

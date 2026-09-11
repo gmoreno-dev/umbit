@@ -6,8 +6,15 @@ fn main() {
     // memória sem ganho visível numa interface de duas cores. Quem quiser pode
     // sobrescrever exportando a variável antes de abrir o app.
     #[cfg(target_os = "linux")]
-    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
-        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    {
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+        // Dentro de um AppImage o WebKit embutido costuma abrir em branco com
+        // composição por GPU em alguns drivers. Desliga por padrão.
+        if std::env::var_os("APPIMAGE").is_some() && std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+        }
     }
     umbit_lib::run()
 }

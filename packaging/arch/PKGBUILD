@@ -1,7 +1,7 @@
 # Maintainer: gmoreno-dev
 # compila do código-fonte. para instalar sem compilar, use o install.sh do repositório.
 pkgname=umbit
-pkgver=0.1.6
+pkgver=0.1.7
 pkgrel=1
 pkgdesc="Cliente Spotify leve, não oficial, em 1 bit"
 arch=('x86_64')
@@ -15,9 +15,9 @@ sha256sums=('SKIP')
 build() {
   cd "$pkgname-$pkgver"
   npm ci
-  npm run build
-  cd src-tauri
-  cargo build --release --locked
+  # a CLI do tauri liga a feature custom-protocol, que embute a interface no binário;
+  # um `cargo build` cru gera um binário que procura o servidor de desenvolvimento.
+  npx tauri build --no-bundle
 }
 
 package() {

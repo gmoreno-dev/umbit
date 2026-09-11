@@ -33,3 +33,16 @@ jobs:
           releaseBody: "Binários Linux (.deb e .AppImage). Precisa de Spotify Premium."
           releaseDraft: false
           prerelease: false
+      - name: tarball do binário (qualquer distro)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          d="umbit-$v-linux-x86_64"
+          mkdir -p "$d"
+          cp src-tauri/target/release/umbit "$d/umbit"
+          cp packaging/umbit.desktop "$d/umbit.desktop"
+          cp src-tauri/icons/128x128.png "$d/umbit.png"
+          cp LICENSE README.md "$d/"
+          tar czf "$d.tar.gz" "$d"
+          gh release upload "$GITHUB_REF_NAME" "$d.tar.gz" --clobber

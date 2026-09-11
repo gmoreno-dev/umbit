@@ -27,44 +27,39 @@ oficial. Abre em menos de um segundo.
 
 Por enquanto só Linux (x86_64). Windows vem em seguida.
 
-### O jeito rápido (Debian, Ubuntu, Mint, Pop!_OS, Arch, Manjaro, EndeavourOS)
+### O jeito rápido (qualquer distro)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/gmoreno-dev/umbit/main/install.sh | bash
 ```
 
 O script descobre a sua distribuição, baixa a última
-[release](../../releases/latest) e instala. Vai pedir a senha do sudo uma vez.
+[release](../../releases/latest) e instala. Em Debian e Ubuntu usa o
+`.deb`; nas outras (Arch, CachyOS, Manjaro, Fedora, openSUSE, Void)
+instala o WebKit pelo gerenciador de pacotes e coloca o binário em
+`/opt/umbit`. Pede a senha do sudo uma vez.
 
-### Debian e Ubuntu, passo a passo
+### Debian e Ubuntu, à mão
 
-1. Baixe o `.deb` da [última release](../../releases/latest) para uma pasta
-   que o sistema consiga ler, como `/tmp` (o apt recusa arquivos dentro de
-   uma home com permissão fechada).
-2. Instale:
+1. Baixe o `.deb` da [última release](../../releases/latest) para `/tmp`
+   (o apt recusa arquivos dentro de uma home com permissão fechada).
+2. `sudo apt install /tmp/Umbit_*_amd64.deb`
 
-   ```bash
-   sudo apt install /tmp/Umbit_*_amd64.deb
-   ```
+### Arch, Fedora, openSUSE e outras, à mão
 
-3. Abra pelo menu ("Umbit") ou rode `umbit` no terminal.
+1. Instale as dependências: `webkit2gtk-4.1`, `gtk3`, `alsa-lib` e
+   `openssl` (os nomes variam um pouco entre distros; no Arch é
+   `sudo pacman -S webkit2gtk-4.1 gtk3 alsa-lib openssl`).
+2. Baixe o `umbit-*-linux-x86_64.tar.gz` da [última release](../../releases/latest),
+   extraia e rode `./umbit`. O `.desktop` e o ícone estão dentro para quem
+   quiser o atalho no menu.
 
-### Arch e derivados, passo a passo
+No Arch também dá para compilar do fonte com o PKGBUILD do repositório
+(`cd packaging/arch && makepkg -si`), o que demora uns 15 minutos.
 
-Pelo AppImage, sem compilar:
-
-1. Dependências: `sudo pacman -S --needed webkit2gtk-4.1 gtk3 alsa-lib openssl`
-2. Baixe o `.AppImage` da [última release](../../releases/latest), dê
-   permissão de execução (`chmod +x Umbit_*.AppImage`) e rode. Se der erro
-   de FUSE, extraia e rode direto: `./Umbit_*.AppImage --appimage-extract && ./squashfs-root/AppRun`.
-
-Compilando do código-fonte, com o PKGBUILD do repositório:
-
-```bash
-git clone https://github.com/gmoreno-dev/umbit.git
-cd umbit/packaging/arch
-makepkg -si
-```
+O AppImage continua na release como último recurso, mas ele embute um
+WebKit antigo e abre em branco em algumas placas de vídeo. Prefira o
+tarball.
 
 ### Depois de instalar
 
