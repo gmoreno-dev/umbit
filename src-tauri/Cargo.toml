@@ -1,6 +1,6 @@
 [package]
 name = "umbit"
-version = "0.1.3"
+version = "0.1.4"
 description = "Cliente Spotify leve, não oficial, em 1 bit."
 authors = ["gmoreno-dev"]
 license = "MIT"

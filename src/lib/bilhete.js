@@ -6,7 +6,7 @@ export const BILHETE = {
 
   // linhas do bilhete que aparece na busca (digitadas uma a uma)
   abertura: ['lembrei de você.', 'separei duas músicas.'],
-  aberturaAniversario: ['feliz aniversário, ana lívia.', 'separei duas músicas.'],
+  aberturaAniversario: ['feliz aniversário, amor.', 'separei duas músicas.'],
 
   // as duas faixas, como linhas do bilhete
   faixas: [
