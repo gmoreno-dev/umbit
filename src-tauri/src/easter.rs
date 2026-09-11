@@ -41,14 +41,27 @@ pub fn is_birthday() -> bool {
     today.month() == 3 && today.day() == 18
 }
 
+/// Contas para as quais o bilhete existe, guardadas como SHA-256 do nome de
+/// usuário em minúsculas, para o repositório não expor os nomes. Quem quiser
+/// o próprio segredo troca estes hashes ou usa `users` na configuração.
+const BUILTIN_USER_HASHES: &[&str] = &[];
+
+fn sha256_hex(s: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut h = Sha256::new();
+    h.update(s.as_bytes());
+    h.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
 pub fn enabled(cfg: &EasterEggConfig, username: Option<&str>) -> bool {
     match cfg.mode.as_str() {
         "always" => true,
         "never" => false,
         _ => match username {
             Some(u) => {
-                let u = u.to_lowercase();
-                cfg.users.iter().any(|x| x.to_lowercase() == u)
+                let u = u.trim().to_lowercase();
+                cfg.users.iter().any(|x| x.trim().to_lowercase() == u)
+                    || BUILTIN_USER_HASHES.contains(&sha256_hex(&u).as_str())
             }
             None => false,
         },
@@ -88,5 +101,10 @@ mod tests {
         assert!(enabled(&cfg, None));
         cfg.mode = "never".into();
         assert!(!enabled(&cfg, Some("moreno")));
+    }
+
+    #[test]
+    fn hash_estavel() {
+        assert_eq!(sha256_hex("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
 }
