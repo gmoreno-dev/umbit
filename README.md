@@ -20,12 +20,12 @@ oficial. Abre em menos de um segundo.
 - Busca de faixas, álbuns e artistas.
 - Tocar, pausar, pular, avançar, volume, fila.
 - Aparece como dispositivo no **Spotify Connect**: controle pelo celular.
-- Teclas de mídia do teclado (MPRIS no Linux).
+- Teclas de mídia do teclado (por enquanto só no Linux, via MPRIS).
 - Quatro temas de duas cores: papel, âmbar, fósforo, gameboy.
 
 ## Instalar
 
-Por enquanto só Linux (x86_64). Windows vem em seguida.
+Linux (x86_64) e Windows 10 e 11 (x64).
 
 ### O jeito rápido (qualquer distro)
 
@@ -60,6 +60,24 @@ No Arch também dá para compilar do fonte com o PKGBUILD do repositório
 O AppImage continua na release como último recurso, mas ele embute um
 WebKit antigo e abre em branco em algumas placas de vídeo. Prefira o
 tarball.
+
+### Windows 10 e 11
+
+Baixe o `Umbit_*_x64-setup.exe` da [última release](../../releases/latest)
+e dê dois cliques. Instala só para o seu usuário, sem pedir administrador,
+e cria o atalho no menu iniciar. Se o Windows Defender SmartScreen
+reclamar de "editor desconhecido", clique em **Mais informações** e
+**Executar assim mesmo**: o instalador não é assinado porque certificado
+custa caro; o código é aberto e a release é gerada pelo GitHub.
+
+Ou, no PowerShell, um comando que baixa e instala em silêncio:
+
+```powershell
+irm https://raw.githubusercontent.com/gmoreno-dev/umbit/main/install.ps1 | iex
+```
+
+No Windows as teclas de mídia do teclado ainda não funcionam (só no
+Linux, via MPRIS). Entra numa próxima versão.
 
 ### Depois de instalar
 
