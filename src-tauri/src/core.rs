@@ -466,6 +466,11 @@ impl Core {
             Err(e) => {
                 let msg = format!("não deu para entrar: {e}");
                 log::error!("{msg}");
+                // A sessão fica suja depois de uma falha (o Connect já registrou
+                // manipuladores nela). Derruba para a próxima tentativa nascer limpa.
+                if !session.is_invalid() {
+                    session.shutdown();
+                }
                 if from_cache {
                     // Credencial guardada não serve mais; pede login de novo.
                     let _ = fs::remove_file(paths::credentials_dir().join("credentials.json"));
