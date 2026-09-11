@@ -226,13 +226,15 @@ impl Api {
     }
 
     pub async fn playlist_tracks(&self, id: &str, offset: u32) -> Result<Page<Track>, String> {
-        let fields = "total,items(track(uri,name,duration_ms,is_local,artists(name),album(name,images)))";
+        // Desde março de 2026 o endpoint é /items e o conteúdo só vem para
+        // playlists do próprio usuário; para as outras, o núcleo usa o librespot.
+        let fields = "total,items(item(uri,name,duration_ms,is_local,artists(name),album(name,images)))";
         let v = self
-            .get(&format!("/playlists/{id}/tracks?limit=100&offset={offset}&fields={fields}"))
+            .get(&format!("/playlists/{id}/items?limit=100&offset={offset}&fields={fields}"))
             .await?;
         let items = arr(&v["items"])
             .iter()
-            .filter_map(|it| parse_track(&it["track"]))
+            .filter_map(|it| parse_track(&it["item"]))
             .collect();
         Ok(Page { items, total: u32_of(&v["total"]), offset })
     }

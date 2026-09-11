@@ -15,7 +15,7 @@ use librespot::{
         authentication::Credentials,
         cache::Cache,
         config::{DeviceType, SessionConfig},
-        Session,
+        Session, SpotifyUri,
     },
     metadata::audio::{AudioItem, UniqueFields},
     oauth::OAuthClientBuilder,
@@ -123,6 +123,31 @@ fn pct_of(volume: u16) -> u8 {
 
 fn volume_of(pct: u8) -> u16 {
     ((pct.min(100) as f64 / 100.0) * u16::MAX as f64).round() as u16
+}
+
+/// Converte a faixa do protocolo interno para o modelo da interface.
+fn track_from_metadata(t: &librespot::metadata::Track) -> Track {
+    let mut covers: Vec<(i32, String)> = t
+        .album
+        .covers
+        .iter()
+        .filter_map(|img| Some((img.width, format!("https://i.scdn.co/image/{}", img.id.to_base16().ok()?))))
+        .collect();
+    covers.sort_by_key(|(w, _)| *w);
+    let cover = covers
+        .iter()
+        .find(|(w, _)| *w >= 250)
+        .or_else(|| covers.last())
+        .map(|(_, u)| u.clone());
+    Track {
+        uri: t.id.to_uri().unwrap_or_default(),
+        name: t.name.clone(),
+        artists: t.artists.iter().map(|a| a.name.clone()).collect(),
+        album: t.album.name.clone(),
+        duration_ms: t.duration.max(0) as u32,
+        cover,
+        extra: None,
+    }
 }
 
 fn track_from_item(item: &AudioItem) -> Track {
@@ -742,7 +767,46 @@ impl Core {
     }
 
     pub async fn playlist_tracks(&self, uri: &str, offset: u32) -> Result<Page<Track>, String> {
-        self.api()?.playlist_tracks(api::id_of(uri), offset).await
+        match self.api()?.playlist_tracks(api::id_of(uri), offset).await {
+            Ok(page) if !page.items.is_empty() || page.total == 0 => Ok(page),
+            Ok(_) => self.playlist_tracks_native(uri, offset).await,
+            Err(e) => {
+                log::info!("web api recusou a playlist ({e}); usando o caminho interno");
+                self.playlist_tracks_native(uri, offset).await
+            }
+        }
+    }
+
+    /// Faixas de uma playlist pelo protocolo interno (spclient), que funciona
+    /// para qualquer playlist, inclusive as que o usuário só segue.
+    async fn playlist_tracks_native(&self, uri: &str, offset: u32) -> Result<Page<Track>, String> {
+        use futures::StreamExt;
+        use librespot::metadata::{Metadata, Playlist, Track as MdTrack};
+
+        let session = self.session.lock().unwrap().clone();
+        let id = SpotifyUri::from_uri(uri).map_err(|e| format!("uri: {e}"))?;
+        let list = Playlist::get(&session, &id).await.map_err(|e| format!("playlist: {e}"))?;
+        let uris: Vec<SpotifyUri> = list.tracks().cloned().collect();
+        let total = uris.len() as u32;
+        let slice: Vec<SpotifyUri> = uris.into_iter().skip(offset as usize).take(100).collect();
+        let items: Vec<Track> = futures::stream::iter(slice)
+            .map(|track_uri| {
+                let session = session.clone();
+                async move {
+                    match MdTrack::get(&session, &track_uri).await {
+                        Ok(t) => Some(track_from_metadata(&t)),
+                        Err(e) => {
+                            log::debug!("faixa {track_uri:?}: {e}");
+                            None
+                        }
+                    }
+                }
+            })
+            .buffered(8)
+            .filter_map(|t| async move { t })
+            .collect()
+            .await;
+        Ok(Page { items, total, offset })
     }
 
     pub async fn liked(&self, offset: u32) -> Result<Page<Track>, String> {
