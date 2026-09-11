@@ -12,7 +12,7 @@ export const THEME_ORDER = ['papel', 'ambar', 'fosforo', 'gameboy'];
 // temas automáticos do easter egg, só enquanto a faixa toca (nunca persistem):
 // a dela = roxo escuro; a nossa = roxo sobre cinza.
 export const EGG_THEMES = {
-  'egg-next': ['#e9dcff', '#1c0f2e'],
+  'egg-hers': ['#e9dcff', '#1c0f2e'],
   'egg-ours': ['#4a2a7a', '#cfc9d6'],
 };
 

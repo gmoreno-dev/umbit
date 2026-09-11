@@ -864,17 +864,17 @@ impl Core {
         Some(vec![easter::decorate(&egg.hers), egg.ours])
     }
 
-    /// Toca a nossa primeiro, depois a dela.
+    /// Toca a dela primeiro, depois a nossa.
     pub async fn play_egg(&self) -> Result<(), String> {
         if !self.egg_enabled() {
             return Err("nada aqui".into());
         }
         let egg = self.egg_tracks().await.ok_or("não achei as músicas no spotify")?;
         let mut hers = egg.hers.clone();
-        hers.extra = Some("egg-next".into());
+        hers.extra = Some("egg-hers".into());
         let mut ours = egg.ours.clone();
         ours.extra = Some("egg-ours".into());
-        self.play_tracks(vec![ours, hers], Some("ana lívia".into()), Some(easter::NOTE.into()), true)
+        self.play_tracks(vec![hers, ours], Some("ana lívia".into()), Some(easter::NOTE.into()), true)
     }
 
     // ---------- capas ----------

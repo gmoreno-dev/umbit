@@ -1,4 +1,5 @@
 <script>
+  import { BILHETE } from '../lib/bilhete.js';
   // fila: faixa atual invertida com ícone, depois as próximas numeradas
   import { app, act } from '../lib/state.svelte.js';
   import { setScreenKeys, moveCursor } from '../lib/keyboard.js';
@@ -7,6 +8,7 @@
   import Hints from '../components/Hints.svelte';
 
   const q = $derived(app.queue);
+  const note = $derived((q.current && BILHETE.fila[q.current.extra]) || q.note);
   const n = $derived((q.current ? 1 : 0) + q.upcoming.length);
   const minutes = $derived(Math.round(((q.current ? q.current.duration_ms : 0) + q.upcoming.reduce((s, t) => s + (t.duration_ms || 0), 0)) / 60000));
   let listEl = $state(null);
@@ -68,8 +70,8 @@
     {/if}
   </div>
 
-  {#if q.note}
-    <div class="note">{q.note}</div>
+  {#if note}
+    <div class="note">{note}</div>
   {/if}
 
   <Hints items={['j k mover', 'enter tocar daqui']} />

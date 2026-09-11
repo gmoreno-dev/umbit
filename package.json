@@ -1,7 +1,7 @@
 {
   "name": "umbit",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "description": "Cliente Spotify leve, não oficial, em 1 bit.",
   "scripts": {

@@ -7,6 +7,8 @@
   import Row from '../components/Row.svelte';
   import Heart from '../components/Heart.svelte';
   import Hints from '../components/Hints.svelte';
+  import Bilhete from '../components/Bilhete.svelte';
+  import { BILHETE } from '../lib/bilhete.js';
 
   const st = $derived(app.search);
   let input = $state(null);
@@ -19,6 +21,9 @@
 
   const eggOn = $derived(app.session.easter_egg);
   const heartCursor = $derived(eggOn && normalize(st.query) === 'analivia');
+  // a busca por ela vira um bilhete (a primeira linha dos resultados é a matilda marcada)
+  const bilhete = $derived(!st.open && st.results && st.results.tracks[0] && st.results.tracks[0].extra === 'egg');
+  const abertura = $derived(app.session.birthday ? BILHETE.aberturaAniversario : BILHETE.abertura);
 
   // grupos com índice global de linha (o cursor percorre todas)
   const groups = $derived.by(() => {
@@ -226,12 +231,19 @@
   {/if}
 
   <div class="results scroll" bind:this={listEl}>
+    {#if bilhete}
+      <div class="bilhete-wrap" class:active={st.cursor === 0}>
+        <Bilhete header={BILHETE.para} lines={abertura} tracks={BILHETE.faixas} active={st.cursor === 0} onclick={() => activate(0)} />
+      </div>
+    {/if}
     {#each groups as g (g.id)}
       <div class="group">
-        {#if g.label}<div class="label pix">{g.label}</div>{/if}
+        {#if g.label && !(bilhete && g.id === 'tracks' && g.rows.length === 1)}<div class="label pix">{g.label}</div>{/if}
         {#each g.rows as r (r.kind + r.item.uri + r.idx)}
-          {#if r.kind === 'track'}
-            <Row text={trackLine(r.item)} meta={mmss(r.item.duration_ms)} heart={r.item.extra === 'egg'} active={st.cursor === r.idx} onclick={() => activate(r.idx)} />
+          {#if r.kind === 'track' && r.item.extra === 'egg'}
+            <!-- a matilda é o bilhete acima -->
+          {:else if r.kind === 'track'}
+            <Row text={trackLine(r.item)} meta={mmss(r.item.duration_ms)} active={st.cursor === r.idx} onclick={() => activate(r.idx)} />
           {:else if r.kind === 'album'}
             <Row text={r.item.name} meta={r.item.year || ''} thumb={r.item.cover} active={st.cursor === r.idx} onclick={() => activate(r.idx)} />
           {:else if r.kind === 'artist'}
@@ -253,6 +265,12 @@
 </div>
 
 <style>
+  .bilhete-wrap {
+    padding: 10px 8px 18px 4px;
+  }
+  .bilhete-wrap.active {
+    scroll-margin: 8px;
+  }
   .search {
     flex: 0 1 auto;
     min-height: 0;

@@ -7,6 +7,8 @@
   import Marquee from '../components/Marquee.svelte';
   import Heart from '../components/Heart.svelte';
   import Hints from '../components/Hints.svelte';
+  import Bilhete from '../components/Bilhete.svelte';
+  import { BILHETE } from '../lib/bilhete.js';
 
   let innerWidth = $state(window.innerWidth);
   let innerHeight = $state(window.innerHeight);
@@ -38,10 +40,11 @@
   // 1:43 -> o ":" vira coração por esse segundo
   const heartColon = $derived(eggOn && !!track && pos >= 103000 && pos < 104000);
   const timeParts = $derived(mmss(pos).split(':'));
-  // "a nossa": tocando por causa do egg e a faixa é a sign of the times
-  const ours = $derived(eggOn && app.now.egg && !!track && (!track.extra || track.extra === 'egg-ours'));
+  // ---- o bilhete ----
+  // fase: 'egg-hers' (a dela), 'egg-ours' (a nossa) ou null
+  const eggPhase = $derived(eggOn && app.now.egg && track && BILHETE.durante[track.extra] ? track.extra : null);
 
-  // ---- easter egg 2: revelação do título (uma vez por faixa) ----
+  // quando a nossa começa, o título se assenta letra a letra
   const GLYPHS = '▚▞░▒▓#%';
   function scramble(target, p) {
     const n = target.length;
@@ -53,54 +56,59 @@
     }
     return s;
   }
-  let reveal = $state(null); // { title, artist, cover, from, mix }
-  const revealKey = $derived(ours && track ? track.uri : null);
+  let scrambled = $state(null);
+  const scrambleKey = $derived(eggPhase === 'egg-ours' && track ? track.uri : null);
   $effect(() => {
-    const uri = revealKey;
+    const uri = scrambleKey;
     if (!uri || memo.revealedUri === uri) return;
     memo.revealedUri = uri;
-    const timers = [];
-    untrack(() => {
-      const t = app.now.track;
-      const matilda = app.queue.upcoming[0];
-      const from = matilda && matilda.cover ? matilda.cover : null;
-      const finalTitle = `${t.name} · a nossa`;
-      const finalArtist = `${artistsOf(t)} · ${t.album}`;
-      // 4 s como se fosse a matilda
-      reveal = { title: 'Matilda', artist: 'Harry Styles', cover: from, from: null, mix: 1 };
-      timers.push(
-        setTimeout(() => {
-          // 1,2 s de dissolução: título a cada 60 ms, capa a cada 80 ms
-          const start = Date.now();
-          const step = () => Math.min(1, (Date.now() - start) / 1200);
-          reveal = { title: scramble(finalTitle, 0), artist: scramble(finalArtist, 0), cover: t.cover, from, mix: 0 };
-          const idT = setInterval(() => {
-            const p = step();
-            reveal.title = scramble(finalTitle, p);
-            reveal.artist = scramble(finalArtist, p);
-            if (p >= 1) clearInterval(idT);
-          }, 60);
-          const idC = setInterval(() => {
-            const p = step();
-            reveal.mix = p;
-            if (p >= 1) {
-              clearInterval(idC);
-              clearInterval(idT);
-              reveal = null;
-            }
-          }, 80);
-          timers.push(idT, idC);
-        }, 4000),
-      );
-    });
-    return () => {
-      for (const x of timers) {
-        clearTimeout(x);
-        clearInterval(x);
+    const name = untrack(() => app.now.track.name);
+    const start = Date.now();
+    scrambled = scramble(name, 0);
+    const id = setInterval(() => {
+      const p = Math.min(1, (Date.now() - start) / 1200);
+      scrambled = scramble(name, p);
+      if (p >= 1) {
+        clearInterval(id);
+        scrambled = null;
       }
-      reveal = null;
+    }, 60);
+    return () => {
+      clearInterval(id);
+      scrambled = null;
     };
   });
+
+  // bilhete colado na capa: aparece 2,5 s depois que a faixa começa e fica 16 s (uma vez por faixa)
+  let nota = $state(null); // string[] ou null
+  const notaKey = $derived(eggPhase && track ? `${eggPhase}:${track.uri}` : null);
+  $effect(() => {
+    const key = notaKey;
+    if (!key || memo.notaShown === key) return;
+    memo.notaShown = key;
+    const lines = BILHETE.durante[key.split(':')[0]];
+    const t1 = setTimeout(() => (nota = lines), 2500);
+    const t2 = setTimeout(() => (nota = null), 2500 + 16000);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      nota = null;
+    };
+  });
+
+  // o bilhete fechado: nos últimos segundos da nossa, fica até qualquer tecla
+  let fim = $state(false);
+  const fimKey = $derived(eggPhase === 'egg-ours' && dur > 0 && pos >= dur - 1500 ? track.uri : null);
+  $effect(() => {
+    const k = fimKey;
+    if (!k || memo.fimShown === k) return;
+    memo.fimShown = k;
+    nota = null;
+    fim = true;
+  });
+  function anyKey() {
+    if (fim) fim = false;
+  }
 
   // ---- aniversário: o letreiro alterna a cada 8 s ----
   let bdayFlip = $state(false);
@@ -117,17 +125,16 @@
   });
 
   const title = $derived.by(() => {
-    if (reveal) return reveal.title;
+    if (scrambled) return scrambled;
     if (bdayFlip) return 'feliz aniversário, ana lívia ♥';
     if (!track) return 'nada tocando';
-    return ours ? `${track.name} · a nossa` : track.name;
+    return track.name;
   });
   const subtitle = $derived.by(() => {
-    if (reveal) return reveal.artist;
     if (!track) return '/ para buscar';
     return `${artistsOf(track)} · ${track.album}`;
   });
-  const coverUrl = $derived(reveal ? reveal.cover : track ? track.cover : null);
+  const coverUrl = $derived(track ? track.cover : null);
 
   function seekTo(i) {
     if (!dur) return;
@@ -138,11 +145,24 @@
   }
 </script>
 
-<svelte:window bind:innerWidth bind:innerHeight />
+<svelte:window bind:innerWidth bind:innerHeight onkeydown={anyKey} />
 
 <div class="playing">
   <div class="art">
-    <Cover url={coverUrl} from={reveal ? reveal.from : null} mix={reveal ? reveal.mix : 1} size={coverSize} frame ink={app.ink} paper={app.paper} />
+    <div class="artbox" style:width="{coverSize}px" style:height="{coverSize}px">
+      {#if fim}
+        <div class="fim">
+          <Bilhete header={BILHETE.para} lines={BILHETE.fim} fim tilt={false} />
+        </div>
+      {:else}
+        <Cover url={coverUrl} size={coverSize} frame ink={app.ink} paper={app.paper} />
+        {#if nota}
+          <div class="nota">
+            <Bilhete lines={nota} small />
+          </div>
+        {/if}
+      {/if}
+    </div>
   </div>
 
   <div class="text">
@@ -195,6 +215,27 @@
 </div>
 
 <style>
+  .artbox {
+    position: relative;
+    max-width: 100%;
+  }
+  .nota {
+    position: absolute;
+    left: 10px;
+    right: 16px;
+    bottom: 14px;
+  }
+  .fim {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 8px 6px 2px;
+  }
+  .fim :global(.bilhete) {
+    width: 100%;
+  }
   .playing {
     flex: 1;
     min-height: 0;

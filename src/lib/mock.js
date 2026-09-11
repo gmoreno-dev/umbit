@@ -165,7 +165,7 @@ function albumTracks(album) {
 const MATILDA = {
   uri: 'spotify:track:egg:matilda',
   name: 'Matilda',
-  artists: ['Harry Styles (o único que eu aceito)'],
+  artists: ['Harry Styles'],
   album: "Harry's House",
   duration_ms: 245000,
   cover: 'mock://matilda',
@@ -266,7 +266,7 @@ function startTrack(i) {
   now.playing = false;
   now.position_ms = 0;
   now.at_ms = Date.now();
-  now.egg = t.extra === 'egg-ours' || t.extra === 'egg-next';
+  now.egg = t.extra === 'egg-ours' || t.extra === 'egg-hers';
   emit('now_playing', now);
   syncQueue();
   // "carregando" por um instante, como o núcleo real
@@ -485,10 +485,10 @@ const commands = {
   async play_egg() {
     requireLogin();
     if (!eggOn()) throw 'nada aqui';
-    list = [{ ...clone(OURS), extra: 'egg-ours' }, { ...clone(MATILDA), extra: 'egg-next' }];
+    list = [{ ...clone(MATILDA), extra: 'egg-hers' }, { ...clone(OURS), extra: 'egg-ours' }];
     queue.context_uri = null;
     queue.context_name = 'pra ana lívia';
-    queue.note = 'primeiro a nossa, depois a sua';
+    queue.note = 'primeiro a sua, depois a nossa';
     startTrack(0);
   },
 

@@ -15,8 +15,8 @@ pub const HERS: (&str, &str) = ("Matilda", "Harry Styles");
 /// A nossa.
 pub const OURS: (&str, &str) = ("Sign of the Times", "Harry Styles");
 
-pub const NOTE: &str = "primeiro a nossa, depois a sua";
-pub const ARTIST_TEASE: &str = "Harry Styles (o único que eu aceito)";
+pub const NOTE: &str = "primeiro a sua, depois a nossa";
+pub const ARTIST_TEASE: &str = "Harry Styles";
 
 #[derive(Debug, Clone)]
 pub struct EggTracks {
@@ -55,7 +55,7 @@ pub fn enabled(cfg: &EasterEggConfig, username: Option<&str>) -> bool {
     }
 }
 
-/// A linha que aparece na busca: a música dela, com a provocação no artista.
+/// A linha que aparece na busca: a música dela, marcada para virar o bilhete.
 pub fn decorate(hers: &Track) -> Track {
     let mut t = hers.clone();
     t.artists = vec![ARTIST_TEASE.to_string()];
