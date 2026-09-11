@@ -44,7 +44,10 @@ pub fn is_birthday() -> bool {
 /// Contas para as quais o bilhete existe, guardadas como SHA-256 do nome de
 /// usuário em minúsculas, para o repositório não expor os nomes. Quem quiser
 /// o próprio segredo troca estes hashes ou usa `users` na configuração.
-const BUILTIN_USER_HASHES: &[&str] = &[];
+const BUILTIN_USER_HASHES: &[&str] = &[
+    "67ee6be9b08bddf35053cd76721d7b323d0809a667e78ef3114a6840f4fb8043",
+    "49a4b068aac0b8db1acf6d98a59cb79ccdf9525dd8581581a8161a9540148a52",
+];
 
 fn sha256_hex(s: &str) -> String {
     use sha2::{Digest, Sha256};

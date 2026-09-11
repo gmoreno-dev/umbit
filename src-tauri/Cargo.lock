@@ -5699,7 +5699,7 @@ dependencies = [
 
 [[package]]
 name = "umbit"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "chrono",
  "dirs 7.0.0",
