@@ -31,7 +31,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::mpsc;
 
 use crate::{
-    api::{self, Api},
+    api::{self, Api, TokenSource, OAUTH_REDIRECT},
     config::Config,
     easter::{self, EggTracks},
     models::{Album, ClientConfig, ErrorEvent, NowPlaying, Page, Playlist, QueueView, SearchResults, SessionInfo, Track},
@@ -39,7 +39,6 @@ use crate::{
     paths,
 };
 
-const OAUTH_REDIRECT: &str = "http://127.0.0.1:8898/login";
 const OAUTH_SCOPES: &[&str] = &[
     "app-remote-control",
     "playlist-read",
@@ -109,6 +108,7 @@ pub struct Core {
     info: Mutex<SessionInfo>,
     covers: Mutex<LruCache<String, Arc<Vec<u8>>>>,
     egg: Mutex<Option<EggTracks>>,
+    tokens: Mutex<Option<Arc<TokenSource>>>,
     mpris: mpsc::UnboundedSender<MprisUpdate>,
     login_lock: tokio::sync::Mutex<()>,
 }
@@ -208,6 +208,7 @@ impl Core {
             info: Mutex::new(SessionInfo::default()),
             covers: Mutex::new(LruCache::new(NonZeroUsize::new(48).unwrap())),
             egg: Mutex::new(None),
+            tokens: Mutex::new(None),
             mpris: mpris_tx,
             login_lock: tokio::sync::Mutex::new(()),
         });
@@ -219,7 +220,7 @@ impl Core {
         if let Some(creds) = cache.credentials() {
             let c = core.clone();
             tauri::async_runtime::spawn(async move {
-                c.connect_with(creds, true).await;
+                c.connect_with(creds, true, None).await;
             });
         }
         Ok(core)
@@ -405,7 +406,7 @@ impl Core {
 
     // ---------- sessão ----------
 
-    async fn connect_with(self: Arc<Self>, creds: Credentials, from_cache: bool) {
+    async fn connect_with(self: Arc<Self>, creds: Credentials, from_cache: bool, oauth: Option<librespot::oauth::OAuthToken>) {
         let _guard = self.login_lock.lock().await;
         self.update_info(|i| {
             i.connecting = true;
@@ -435,7 +436,12 @@ impl Core {
             Ok((spirc, task)) => {
                 tauri::async_runtime::spawn(task);
                 *self.spirc.lock().unwrap() = Some(spirc);
-                let api = Api::new(self.http.clone(), session.clone());
+                let tokens = Arc::new(TokenSource::load(session.clone(), self.session_cfg.client_id.clone()));
+                if let Some(t) = oauth {
+                    tokens.store(&t);
+                }
+                *self.tokens.lock().unwrap() = Some(tokens.clone());
+                let api = Api::new(self.http.clone(), tokens);
                 *self.api.lock().unwrap() = Some(api.clone());
                 let profile = api.me().await.ok();
                 let mut username = session.username();
@@ -497,7 +503,8 @@ impl Core {
                 return Err(msg);
             }
         };
-        self.clone().connect_with(Credentials::with_access_token(token.access_token), false).await;
+        let creds = Credentials::with_access_token(token.access_token.clone());
+        self.clone().connect_with(creds, false, Some(token)).await;
         let info = self.session_info();
         if info.logged_in {
             Ok(())
@@ -517,7 +524,9 @@ impl Core {
             }
         }
         let _ = fs::remove_file(paths::credentials_dir().join("credentials.json"));
+        TokenSource::clear();
         *self.api.lock().unwrap() = None;
+        *self.tokens.lock().unwrap() = None;
         *self.egg.lock().unwrap() = None;
         {
             let mut now = self.now.lock().unwrap();

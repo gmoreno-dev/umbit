@@ -1,21 +1,130 @@
-//! Cliente da Web API do Spotify usando o token da própria sessão do
-//! librespot (o mesmo caminho que o ncspot usa). Devolve os modelos leves
-//! de `models.rs`, nunca o JSON cru.
+//! Cliente da Web API do Spotify. Devolve os modelos leves de `models.rs`,
+//! nunca o JSON cru.
+//!
+//! O token vem de uma cadeia com fallback, porque o Spotify vem fechando
+//! caminhos: 1) o token do OAuth feito no login, renovado pelo refresh
+//! token; 2) o token de sessão do login5; 3) o keymaster antigo.
 
-use std::time::Duration;
+use std::{
+    fs,
+    path::PathBuf,
+    sync::Mutex,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
 
-use librespot::core::Session;
+use librespot::{core::Session, oauth::{OAuthClientBuilder, OAuthToken}};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::models::{Album, Artist, Page, Playlist, SearchResults, Track};
+use crate::{
+    models::{Album, Artist, Page, Playlist, SearchResults, Track},
+    paths,
+};
 
 const BASE: &str = "https://api.spotify.com/v1";
 const SCOPES: &str = "user-read-private,user-read-email,playlist-read-private,playlist-read-collaborative,user-library-read,user-top-read";
+pub const OAUTH_REDIRECT: &str = "http://127.0.0.1:8898/login";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct StoredOAuth {
+    access_token: String,
+    refresh_token: String,
+    expires_at_unix: u64,
+}
+
+fn unix_now() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+}
+
+/// Fonte de tokens para a Web API.
+pub struct TokenSource {
+    session: Session,
+    client_id: String,
+    oauth: Mutex<Option<StoredOAuth>>,
+}
+
+impl TokenSource {
+    fn path() -> PathBuf {
+        paths::cache_dir().join("oauth.json")
+    }
+
+    pub fn load(session: Session, client_id: String) -> Self {
+        let stored = fs::read_to_string(Self::path())
+            .ok()
+            .and_then(|s| serde_json::from_str::<StoredOAuth>(&s).ok());
+        Self { session, client_id, oauth: Mutex::new(stored) }
+    }
+
+    /// Guarda o token do OAuth (na memória e no disco) para as próximas execuções.
+    pub fn store(&self, t: &OAuthToken) {
+        let ttl = t.expires_at.saturating_duration_since(Instant::now()).as_secs();
+        let stored = StoredOAuth {
+            access_token: t.access_token.clone(),
+            refresh_token: t.refresh_token.clone(),
+            expires_at_unix: unix_now() + ttl,
+        };
+        if let Ok(json) = serde_json::to_string(&stored) {
+            let _ = fs::create_dir_all(paths::cache_dir());
+            let _ = fs::write(Self::path(), json);
+        }
+        *self.oauth.lock().unwrap() = Some(stored);
+    }
+
+    pub fn clear() {
+        let _ = fs::remove_file(Self::path());
+    }
+
+    /// Marca o token atual como vencido (depois de um 401, por exemplo).
+    fn invalidate(&self) {
+        if let Some(o) = self.oauth.lock().unwrap().as_mut() {
+            o.expires_at_unix = 0;
+        }
+    }
+
+    async fn token(&self) -> Result<String, String> {
+        // 1. OAuth ainda válido
+        let current = self.oauth.lock().unwrap().clone();
+        if let Some(o) = &current {
+            if o.expires_at_unix > unix_now() + 60 {
+                return Ok(o.access_token.clone());
+            }
+        }
+        // 2. renovar pelo refresh token
+        if let Some(o) = &current {
+            match OAuthClientBuilder::new(&self.client_id, OAUTH_REDIRECT, Vec::new()).build() {
+                Ok(client) => match client.refresh_token_async(&o.refresh_token).await {
+                    Ok(t) => {
+                        log::info!("token oauth renovado");
+                        self.store(&t);
+                        return Ok(t.access_token);
+                    }
+                    Err(e) => log::warn!("refresh do oauth falhou: {e}"),
+                },
+                Err(e) => log::warn!("oauth client: {e}"),
+            }
+        }
+        // 3. login5
+        match self.session.login5().auth_token().await {
+            Ok(t) => {
+                log::debug!("usando token login5");
+                return Ok(t.access_token);
+            }
+            Err(e) => log::warn!("login5: {e}"),
+        }
+        // 4. keymaster
+        self.session
+            .token_provider()
+            .get_token(SCOPES)
+            .await
+            .map(|t| t.access_token)
+            .map_err(|e| format!("token: {e}"))
+    }
+}
 
 #[derive(Clone)]
 pub struct Api {
     http: reqwest::Client,
-    session: Session,
+    tokens: std::sync::Arc<TokenSource>,
 }
 
 #[derive(Debug, Clone)]
@@ -25,18 +134,12 @@ pub struct Profile {
 }
 
 impl Api {
-    pub fn new(http: reqwest::Client, session: Session) -> Self {
-        Self { http, session }
+    pub fn new(http: reqwest::Client, tokens: std::sync::Arc<TokenSource>) -> Self {
+        Self { http, tokens }
     }
 
     async fn token(&self) -> Result<String, String> {
-        let t = self
-            .session
-            .token_provider()
-            .get_token(SCOPES)
-            .await
-            .map_err(|e| format!("token: {e}"))?;
-        Ok(t.access_token)
+        self.tokens.token().await
     }
 
     async fn get(&self, path: &str) -> Result<Value, String> {
@@ -57,6 +160,10 @@ impl Api {
                 .await
                 .map_err(|e| format!("rede: {e}"))?;
             let status = resp.status();
+            if status.as_u16() == 401 && attempts < 2 {
+                self.tokens.invalidate();
+                continue;
+            }
             if status.as_u16() == 429 && attempts < 3 {
                 let wait = resp
                     .headers()
