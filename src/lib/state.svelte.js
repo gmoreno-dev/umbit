@@ -96,6 +96,16 @@ export function goBackFromAbout() {
   setScreen(app.prevScreen || 'playing');
 }
 
+// ---------- aleatório ----------
+
+export function toggleShuffle() {
+  if (!app.session.logged_in) return;
+  const on = !app.now.shuffle;
+  app.now.shuffle = on; // otimista; o núcleo confirma no próximo now_playing
+  act('set_shuffle', { on });
+  toast(on ? 'aleatório ligado' : 'aleatório desligado');
+}
+
 // ---------- temas ----------
 
 function liviaAllowed() {
@@ -192,6 +202,8 @@ function resetData() {
   app.search.cursor = -1;
   app.queueCursor = 0;
   memo.revealedUri = null;
+  memo.notaShown = null;
+  memo.fimShown = null;
 }
 
 function applySession(s) {
@@ -268,6 +280,21 @@ export async function init() {
     app.liviaUnlocked = false;
   }
 
+  // Assina os eventos ANTES de pedir o estado inicial. Ao abrir já logado, o
+  // núcleo reconecta com a credencial do cache e emite "session"; se a assinatura
+  // viesse depois, esse evento se perdia e a tela ficava sem carregar nada.
+  await Promise.all([
+    api.on('session', applySession),
+    api.on('now_playing', (p) => {
+      app.now = p;
+      syncEggTheme();
+    }),
+    api.on('queue', (p) => {
+      app.queue = p;
+    }),
+    api.on('error', (p) => toast(p && p.message ? p.message : 'erro no núcleo')),
+  ]);
+
   const safe = (name, args, fallback) => api.call(name, args).catch(() => fallback);
   const [config, session, now, queue] = await Promise.all([
     safe('get_config', undefined, null),
@@ -284,18 +311,6 @@ export async function init() {
   // tema salvo; se for "livia" gravado no núcleo, conta como desbloqueado
   if (app.config.theme === 'livia') app.liviaUnlocked = true;
   if (!applyTheme(app.config.theme || 'papel', false)) applyTheme('papel', false);
-
-  await Promise.all([
-    api.on('session', applySession),
-    api.on('now_playing', (p) => {
-      app.now = p;
-      syncEggTheme();
-    }),
-    api.on('queue', (p) => {
-      app.queue = p;
-    }),
-    api.on('error', (p) => toast(p && p.message ? p.message : 'erro no núcleo')),
-  ]);
 
   app.ready = true;
 

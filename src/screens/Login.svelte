@@ -80,7 +80,7 @@
     {#if app.session.error}
       <div class="err">{app.session.error}</div>
     {/if}
-    <div class="help">abre o navegador uma vez para autorizar. depois disso nunca mais pede.</div>
+    <div class="help">abre o navegador para autorizar (na primeira vez, duas telas: o seu app e o player). depois disso não pede mais.</div>
   </div>
   <div class="foot">
     <span>não oficial · librespot</span><span>v{app.config.version}</span>

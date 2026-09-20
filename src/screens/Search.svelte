@@ -100,7 +100,9 @@
     const { kind, item } = row;
     if (kind === 'track') {
       if (item.extra === 'egg') act('play_egg');
-      else act('play_tracks', { tracks: [item], name: 'busca' });
+      // toca a faixa como contexto próprio: o autoplay do librespot emenda um
+      // rádio e a música continua, em vez de parar quando ela acaba.
+      else act('play_context', { uri: item.uri, trackUri: item.uri, name: 'busca', tracks: [item] });
     } else if (kind === 'album') {
       openAlbum(item);
     } else if (kind === 'artist') {

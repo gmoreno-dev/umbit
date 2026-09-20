@@ -57,6 +57,9 @@ pub struct TokenSource {
     session: Session,
     client_id: String,
     oauth: Mutex<Option<StoredOAuth>>,
+    /// Depois de um refresh que falha, espera um pouco antes de tentar de novo,
+    /// para não repetir a chamada de rede a cada pedido à Web API.
+    refresh_backoff: Mutex<Option<Instant>>,
 }
 
 impl TokenSource {
@@ -68,7 +71,7 @@ impl TokenSource {
         let stored = fs::read_to_string(Self::path())
             .ok()
             .and_then(|s| serde_json::from_str::<StoredOAuth>(&s).ok());
-        Self { session, client_id, oauth: Mutex::new(stored) }
+        Self { session, client_id, oauth: Mutex::new(stored), refresh_backoff: Mutex::new(None) }
     }
 
     /// Guarda o token do OAuth (na memória e no disco) para as próximas execuções.
@@ -106,19 +109,32 @@ impl TokenSource {
                 return Ok(o.access_token.clone());
             }
         }
-        // 2. renovar pelo refresh token
-        if let Some(o) = &current {
-            let cid = if o.client_id.is_empty() { self.client_id.clone() } else { o.client_id.clone() };
-            match OAuthClientBuilder::new(&cid, OAUTH_REDIRECT, Vec::new()).build() {
-                Ok(client) => match client.refresh_token_async(&o.refresh_token).await {
-                    Ok(t) => {
-                        log::info!("token oauth renovado");
-                        self.store(&t, &cid);
-                        return Ok(t.access_token);
-                    }
-                    Err(e) => log::warn!("refresh do oauth falhou: {e}"),
-                },
-                Err(e) => log::warn!("oauth client: {e}"),
+        // 2. renovar pelo refresh token (com um respiro após falha, para não
+        //    repetir a chamada a cada pedido antes de cair no login5)
+        let cooling = self
+            .refresh_backoff
+            .lock()
+            .unwrap()
+            .map(|t| t > Instant::now())
+            .unwrap_or(false);
+        if !cooling {
+            if let Some(o) = &current {
+                let cid = if o.client_id.is_empty() { self.client_id.clone() } else { o.client_id.clone() };
+                match OAuthClientBuilder::new(&cid, OAUTH_REDIRECT, Vec::new()).build() {
+                    Ok(client) => match client.refresh_token_async(&o.refresh_token).await {
+                        Ok(t) => {
+                            log::info!("token oauth renovado");
+                            *self.refresh_backoff.lock().unwrap() = None;
+                            self.store(&t, &cid);
+                            return Ok(t.access_token);
+                        }
+                        Err(e) => {
+                            log::warn!("refresh do oauth falhou: {e}");
+                            *self.refresh_backoff.lock().unwrap() = Some(Instant::now() + Duration::from_secs(60));
+                        }
+                    },
+                    Err(e) => log::warn!("oauth client: {e}"),
+                }
             }
         }
         // 3. login5
@@ -194,7 +210,7 @@ impl Api {
                 continue;
             }
             if status.as_u16() == 429 {
-                return Err("spotify limitou o client id compartilhado (429). configure o seu próprio client_id em ~/.config/umbit/config.toml, veja o README".into());
+                return Err("o spotify limitou as buscas (429). entre com o seu próprio client id no campo da tela de login para ter uma cota só sua; veja o README".into());
             }
             if !status.is_success() {
                 let body = resp.text().await.unwrap_or_default();

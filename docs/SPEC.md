@@ -81,6 +81,9 @@ contexto, o espelho é descartado e a fila mostra só a faixa atual.
   partir de qualquer ponto; reordenar e remover ficam para depois, porque o
   Spotify Connect é a fonte de verdade da fila e o librespot 0.8 não expõe
   edição).
+- Modo aleatório (embaralhamento uniforme do librespot, aleatório de verdade) e
+  autoplay: quando o contexto acaba, o librespot emenda um rádio a partir da
+  última faixa e a reprodução continua, como o app oficial.
 - Aparecer como dispositivo Spotify Connect (controlar pelo celular).
 - Teclas de mídia via MPRIS.
 - Navegação completa por teclado.

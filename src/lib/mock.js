@@ -213,7 +213,7 @@ const now = {
   position_ms: 0,
   at_ms: Date.now(),
   volume: 60,
-  shuffle: false,
+  shuffle: ls.get('umbit.mock.shuffle') === '1',
   repeat: false,
   active: true,
   egg: false,
@@ -233,6 +233,21 @@ function currentPos() {
   return Math.min(p, now.track.duration_ms);
 }
 
+// embaralha `list` (Fisher-Yates uniforme) mantendo a faixa escolhida no topo,
+// como o embaralhamento do librespot. devolve o índice inicial (sempre 0).
+function shuffleList(startIndex) {
+  const first = list[startIndex];
+  for (let k = list.length - 1; k > 0; k--) {
+    const j = Math.floor(Math.random() * (k + 1));
+    [list[k], list[j]] = [list[j], list[k]];
+  }
+  if (first) {
+    const at = list.indexOf(first);
+    if (at > 0) [list[0], list[at]] = [list[at], list[0]];
+  }
+  return 0;
+}
+
 function syncQueue() {
   queue.current = list[index] ? clone(list[index]) : null;
   queue.current_index = index;
@@ -247,7 +262,11 @@ function scheduleEnd() {
   const rest = now.track.duration_ms - currentPos();
   endTimer = setTimeout(() => {
     if (index + 1 < list.length) startTrack(index + 1);
-    else {
+    else if (!now.egg && queue.context_uri) {
+      // autoplay: emenda um "rádio" com faixas aleatórias e continua, como o núcleo real
+      for (let k = 0; k < 20; k++) list.push(clone(TRACKS[Math.floor(Math.random() * TRACKS.length)]));
+      startTrack(index + 1);
+    } else {
       now.playing = false;
       now.position_ms = now.track.duration_ms;
       now.at_ms = Date.now();
@@ -486,6 +505,7 @@ const commands = {
     queue.context_uri = uri || null;
     queue.context_name = name || '';
     queue.note = null;
+    if (now.shuffle) i = shuffleList(i);
     startTrack(i);
   },
 
@@ -496,6 +516,7 @@ const commands = {
     queue.context_uri = null;
     queue.context_name = name || '';
     queue.note = null;
+    // lista explícita toca na ordem dada (igual ao núcleo); sem embaralhar
     startTrack(0);
   },
 
@@ -561,6 +582,12 @@ const commands = {
 
   async set_volume({ volume }) {
     now.volume = Math.max(0, Math.min(100, volume | 0));
+    emit('now_playing', now);
+  },
+
+  async set_shuffle({ on }) {
+    now.shuffle = !!on;
+    ls.set('umbit.mock.shuffle', on ? '1' : null);
     emit('now_playing', now);
   },
 

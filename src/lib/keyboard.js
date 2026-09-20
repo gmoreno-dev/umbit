@@ -1,7 +1,7 @@
 // teclado global. cada tela registra o próprio tratador (tem prioridade);
 // o que ele não consumir cai nos atalhos globais.
 
-import { app, setScreen, cycleScreen, act, cycleTheme, unlockLivia, openCommand, goBackFromAbout } from './state.svelte.js';
+import { app, setScreen, cycleScreen, act, cycleTheme, unlockLivia, openCommand, goBackFromAbout, toggleShuffle } from './state.svelte.js';
 
 let screenHandler = null;
 
@@ -27,7 +27,52 @@ function inInput(target) {
   return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable === true;
 }
 
+// teclas de mídia dedicadas do teclado (fn+f7/f8, play/pause, faixa, volume).
+// valem com qualquer foco e em qualquer plataforma quando a janela recebe a
+// tecla; no linux as mesmas teclas também chegam pelo MPRIS com a janela em
+// segundo plano.
+let mutedVol = null;
+function handleMediaKey(e) {
+  if (!app.session.logged_in) return false;
+  switch (e.key) {
+    case 'MediaPlayPause':
+    case 'MediaPlay':
+    case 'MediaPause':
+    case 'MediaStop':
+      act('play_pause');
+      return true;
+    case 'MediaTrackNext':
+      act('next_track');
+      return true;
+    case 'MediaTrackPrevious':
+      act('prev_track');
+      return true;
+    case 'AudioVolumeUp':
+      act('set_volume', { volume: Math.min(100, app.now.volume + 5) });
+      return true;
+    case 'AudioVolumeDown':
+      act('set_volume', { volume: Math.max(0, app.now.volume - 5) });
+      return true;
+    case 'AudioVolumeMute':
+      if (mutedVol == null) {
+        mutedVol = app.now.volume;
+        act('set_volume', { volume: 0 });
+      } else {
+        act('set_volume', { volume: mutedVol });
+        mutedVol = null;
+      }
+      return true;
+    default:
+      return false;
+  }
+}
+
 export function onKey(e) {
+  // teclas de mídia valem em qualquer foco (inclusive dentro de campos de texto)
+  if (app.ready && handleMediaKey(e)) {
+    e.preventDefault();
+    return;
+  }
   if (inInput(e.target)) return; // inputs cuidam das próprias teclas
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (!app.ready) return;
@@ -93,6 +138,9 @@ export function onKey(e) {
       break;
     case 't':
       cycleTheme();
+      break;
+    case 's':
+      toggleShuffle();
       break;
     case 'Escape':
       if (app.screen === 'about') goBackFromAbout();

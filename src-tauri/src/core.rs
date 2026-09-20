@@ -10,7 +10,7 @@ use std::{
 };
 
 use librespot::{
-    connect::{ConnectConfig, LoadRequest, LoadRequestOptions, PlayingTrack, Spirc},
+    connect::{ConnectConfig, LoadContextOptions, LoadRequest, LoadRequestOptions, Options, PlayingTrack, Spirc},
     core::{
         authentication::Credentials,
         cache::Cache,
@@ -75,10 +75,18 @@ impl QueueMirror {
         Self { name: None, uri: None, tracks: Vec::new(), index: None, note: None }
     }
 
-    fn view(&self, current: Option<Track>) -> QueueView {
-        let upcoming = match self.index {
-            Some(i) => self.tracks.iter().skip(i + 1).take(60).cloned().collect(),
-            None => Vec::new(),
+    fn view(&self, current: Option<Track>, shuffle: bool) -> QueueView {
+        // Sob aleatório, o que vem a seguir é sorteado pelo librespot e o espelho
+        // (na ordem original) não bate com a reprodução; então não mostramos uma
+        // lista de "próximas" que estaria errada.
+        let upcoming = match (self.index, shuffle) {
+            (Some(i), false) => self.tracks.iter().skip(i + 1).take(60).cloned().collect(),
+            _ => Vec::new(),
+        };
+        let note = if shuffle && self.index.is_some() {
+            Some(self.note.clone().unwrap_or_else(|| "modo aleatório".into()))
+        } else {
+            self.note.clone()
         };
         QueueView {
             context_name: self.name.clone(),
@@ -87,7 +95,7 @@ impl QueueMirror {
             current_index: self.index.map(|i| i as u32),
             upcoming,
             total: self.tracks.len() as u32,
-            note: self.note.clone(),
+            note,
         }
     }
 }
@@ -101,6 +109,9 @@ pub struct Core {
     mixer: Arc<dyn Mixer>,
     spirc: Mutex<Option<Spirc>>,
     config: Mutex<Config>,
+    /// Modo aleatório. É o próprio embaralhamento do librespot (Fisher-Yates
+    /// uniforme sobre o contexto), guardado aqui para reaplicar a cada `load`.
+    shuffle: Mutex<bool>,
     http: reqwest::Client,
     api: Mutex<Option<Api>>,
     now: Mutex<NowPlaying>,
@@ -176,6 +187,7 @@ fn track_from_item(item: &AudioItem) -> Track {
 impl Core {
     pub fn start(app: AppHandle) -> Result<Arc<Self>, String> {
         let config = Config::load();
+        let start_shuffle = config.shuffle;
         let cache = Cache::new(
             Some(paths::credentials_dir()),
             Some(paths::volume_dir()),
@@ -186,6 +198,9 @@ impl Core {
 
         let mut session_cfg = SessionConfig::default();
         session_cfg.device_id = config.device_id.clone();
+        // Autoplay do próprio librespot: quando o contexto acaba, ele resolve um
+        // rádio a partir da última faixa e continua tocando, como o app oficial.
+        session_cfg.autoplay = Some(config.autoplay);
         let session = Session::new(session_cfg.clone(), Some(cache.clone()));
 
         let mixer_fn = mixer::find(Some("softvol")).ok_or("sem mixer de software")?;
@@ -215,7 +230,7 @@ impl Core {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<MprisCommand>();
         let mpris_tx = mpris::start(cmd_tx);
 
-        let now = NowPlaying { volume: pct_of(initial_volume), at_ms: now_ms(), ..Default::default() };
+        let now = NowPlaying { volume: pct_of(initial_volume), at_ms: now_ms(), shuffle: start_shuffle, ..Default::default() };
 
         let core = Arc::new(Core {
             app,
@@ -226,6 +241,7 @@ impl Core {
             mixer,
             spirc: Mutex::new(None),
             config: Mutex::new(config),
+            shuffle: Mutex::new(start_shuffle),
             http,
             api: Mutex::new(None),
             now: Mutex::new(now),
@@ -272,8 +288,13 @@ impl Core {
     }
 
     fn emit_queue(&self) {
-        let current = self.now.lock().unwrap().track.clone();
-        let view = self.queue.lock().unwrap().view(current);
+        // A máscara segue o estado real da reprodução (o que o librespot reporta
+        // para o contexto atual), não a preferência para o próximo load.
+        let (current, shuffle) = {
+            let n = self.now.lock().unwrap();
+            (n.track.clone(), n.shuffle)
+        };
+        let view = self.queue.lock().unwrap().view(current, shuffle);
         self.emit("queue", view);
     }
 
@@ -302,8 +323,11 @@ impl Core {
     }
 
     pub fn queue_view(&self) -> QueueView {
-        let current = self.now.lock().unwrap().track.clone();
-        self.queue.lock().unwrap().view(current)
+        let (current, shuffle) = {
+            let n = self.now.lock().unwrap();
+            (n.track.clone(), n.shuffle)
+        };
+        self.queue.lock().unwrap().view(current, shuffle)
     }
 
     pub fn client_config(&self) -> ClientConfig {
@@ -553,34 +577,35 @@ impl Core {
             msg
         };
 
-        if own_id.is_empty() {
-            // Só o client id compartilhado: um token para tudo.
-            let t = match self.oauth(&shared_id, OAUTH_SCOPES).await {
-                Ok(t) => t,
-                Err(e) => return Err(fail(&self, e)),
-            };
-            let creds = Credentials::with_access_token(t.access_token.clone());
-            self.clone().connect_with(creds, false, Some((t, shared_id))).await;
+        // 1. Token da Web API do app do usuário (opcional). Evita o 429 na busca e
+        //    na biblioteca. Não é fatal: sem ele, a Web API cai na cadeia de tokens
+        //    da própria sessão.
+        let web = if own_id.is_empty() {
+            None
         } else {
-            // 1. Token do seu app para a Web API (e, se o Spotify aceitar, para a sessão também).
-            let web = match self.oauth(&own_id, WEB_SCOPES).await {
-                Ok(t) => t,
-                Err(e) => return Err(fail(&self, e)),
-            };
-            let creds = Credentials::with_access_token(web.access_token.clone());
-            self.clone().connect_with(creds, false, Some((web.clone(), own_id.clone()))).await;
-            if !self.session_info().logged_in {
-                // 2. A sessão não aceitou o token do seu app: autoriza de novo com o id do librespot.
-                log::warn!("sessão recusou o token do client id próprio; tentando o compartilhado");
-                let t = match self.oauth(&shared_id, OAUTH_SCOPES).await {
-                    Ok(t) => t,
-                    Err(e) => return Err(fail(&self, e)),
-                };
-                let creds = Credentials::with_access_token(t.access_token.clone());
-                // Guarda o token da Web API do seu app, não o do librespot.
-                self.clone().connect_with(creds, false, Some((web, own_id))).await;
+            match self.oauth(&own_id, WEB_SCOPES).await {
+                Ok(t) => Some((t, own_id.clone())),
+                Err(e) => {
+                    log::warn!("oauth do client id próprio falhou, seguindo só com a sessão: {e}");
+                    None
+                }
             }
-        }
+        };
+
+        // 2. Credencial da sessão: sempre pelo client id compartilhado do librespot,
+        //    o único que o servidor de login do Spotify aceita para tocar música. Um
+        //    token de app de terceiros é recusado (Invalid_Credentials), então nem
+        //    tentamos com ele — era isso que dava o erro e abria a segunda tela.
+        let session_tok = match self.oauth(&shared_id, OAUTH_SCOPES).await {
+            Ok(t) => t,
+            Err(e) => return Err(fail(&self, e)),
+        };
+        let creds = Credentials::with_access_token(session_tok.access_token.clone());
+
+        // Guarda o token da Web API: o do app do usuário se houver, senão o da sessão.
+        let store = web.unwrap_or((session_tok, shared_id));
+        self.clone().connect_with(creds, false, Some(store)).await;
+
         let info = self.session_info();
         if info.logged_in {
             Ok(())
@@ -648,11 +673,23 @@ impl Core {
         tracks: Vec<Track>,
     ) -> Result<(), String> {
         let playing_track = track_uri.clone().map(PlayingTrack::Uri).or(index.map(PlayingTrack::Index));
+        let shuffle = *self.shuffle.lock().unwrap();
         self.with_spirc(|s| {
             let _ = s.activate();
             s.load(LoadRequest::from_context_uri(
                 uri.clone(),
-                LoadRequestOptions { start_playing: true, playing_track, ..LoadRequestOptions::default() },
+                LoadRequestOptions {
+                    start_playing: true,
+                    playing_track,
+                    // Embaralhamento uniforme do librespot quando o modo aleatório
+                    // está ligado. O contexto tem uri, então o autoplay segue valendo.
+                    context_options: Some(LoadContextOptions::Options(Options {
+                        shuffle,
+                        repeat: false,
+                        repeat_track: false,
+                    })),
+                    ..LoadRequestOptions::default()
+                },
             ))
         })?;
         {
@@ -669,7 +706,11 @@ impl Core {
             let name = name.or_else(|| q.name.clone());
             *q = QueueMirror { name, uri: Some(uri), tracks, index: start, note: None };
         }
-        self.now.lock().unwrap().egg = false;
+        {
+            let mut now = self.now.lock().unwrap();
+            now.egg = false;
+            now.shuffle = shuffle; // reflete o load atual (o botão e a fila seguem isto)
+        }
         self.emit_queue();
         Ok(())
     }
@@ -683,11 +724,25 @@ impl Core {
             let _ = s.activate();
             s.load(LoadRequest::from_tracks(
                 uris,
-                LoadRequestOptions { start_playing: true, ..LoadRequestOptions::default() },
+                LoadRequestOptions {
+                    start_playing: true,
+                    // Uma lista explícita toca na ordem dada — o bilhete depende
+                    // disso (a dela e depois a nossa), então o aleatório fica de fora.
+                    context_options: Some(LoadContextOptions::Options(Options {
+                        shuffle: false,
+                        repeat: false,
+                        repeat_track: false,
+                    })),
+                    ..LoadRequestOptions::default()
+                },
             ))
         })?;
         *self.queue.lock().unwrap() = QueueMirror { name, uri: None, tracks, index: Some(0), note };
-        self.now.lock().unwrap().egg = egg;
+        {
+            let mut now = self.now.lock().unwrap();
+            now.egg = egg;
+            now.shuffle = false; // lista explícita não é embaralhada
+        }
         self.emit_queue();
         self.emit_now();
         Ok(())
@@ -740,6 +795,25 @@ impl Core {
         self.with_spirc(|s| s.set_volume(v))?;
         self.now.lock().unwrap().volume = pct.min(100);
         self.emit_now();
+        Ok(())
+    }
+
+    /// Liga ou desliga o modo aleatório. O embaralhamento do librespot é um
+    /// Fisher-Yates uniforme sobre as faixas do contexto — aleatório de verdade,
+    /// sem o viés do algoritmo do app oficial. Guarda a preferência (para o
+    /// próximo `load`) e aplica na hora se algo estiver tocando.
+    pub fn set_shuffle(&self, on: bool) -> Result<(), String> {
+        *self.shuffle.lock().unwrap() = on;
+        {
+            let mut cfg = self.config.lock().unwrap();
+            cfg.shuffle = on;
+            cfg.save();
+        }
+        // Sem contexto ativo isto é um no-op; ignoramos o erro de "não entrou".
+        let _ = self.with_spirc(|s| s.shuffle(on));
+        self.now.lock().unwrap().shuffle = on;
+        self.emit_now();
+        self.emit_queue();
         Ok(())
     }
 

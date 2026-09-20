@@ -56,6 +56,7 @@ pub fn run() {
             commands::seek,
             commands::seek_relative,
             commands::set_volume,
+            commands::set_shuffle,
             commands::get_cover,
             commands::check_update,
             commands::install_update,

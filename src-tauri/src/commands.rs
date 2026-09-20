@@ -151,6 +151,11 @@ pub fn set_volume(core: C, volume: u8) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn set_shuffle(core: C, on: bool) -> Result<(), String> {
+    core.set_shuffle(on)
+}
+
+#[tauri::command]
 pub async fn get_cover(core: C<'_>, url: String) -> Result<tauri::ipc::Response, String> {
     let bytes = core.cover(&url).await?;
     Ok(tauri::ipc::Response::new(bytes.as_ref().clone()))
