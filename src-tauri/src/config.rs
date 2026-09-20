@@ -20,6 +20,11 @@ pub struct Config {
     /// limita por aplicação, e o id compartilhado do librespot vive no limite.
     /// Vazio = usa o compartilhado.
     pub client_id: String,
+    /// Ao acabar o contexto, continuar tocando um rádio a partir da última faixa,
+    /// como o app oficial.
+    pub autoplay: bool,
+    /// Modo aleatório (embaralhamento uniforme das faixas do contexto).
+    pub shuffle: bool,
     pub easter_egg: EasterEggConfig,
 }
 
@@ -56,6 +61,8 @@ impl Default for Config {
             device_id: String::new(),
             bitrate: 160,
             client_id: String::new(),
+            autoplay: true,
+            shuffle: false,
             easter_egg: EasterEggConfig::default(),
         }
     }
@@ -94,7 +101,9 @@ impl Config {
     }
 }
 
-/// UUID v4 sem depender de mais um crate: 16 bytes aleatórios do sistema.
+/// UUID v4 sem depender de mais um crate. Não é aleatoriedade forte: são 16 bytes
+/// de um xorshift64* semeado pelo relógio e pelo PID. Serve só como identificador
+/// estável do dispositivo, nunca como segredo.
 fn uuid_v4() -> String {
     let mut bytes = [0u8; 16];
     let seed = std::time::SystemTime::now()

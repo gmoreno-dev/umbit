@@ -15,6 +15,7 @@
     ['n p', 'pular'],
     ['← →', '−5 s / +5 s'],
     ['- = t', 'volume · tema'],
+    ['s', 'aleatório'],
   ];
 
   $effect(() =>

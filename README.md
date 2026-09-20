@@ -19,8 +19,11 @@ oficial. Abre em menos de um segundo.
 - Suas playlists, músicas curtidas e álbuns salvos.
 - Busca de faixas, álbuns e artistas.
 - Tocar, pausar, pular, avançar, volume, fila.
+- Modo aleatório de verdade: embaralhamento uniforme, sem o viés do app oficial.
+- Continua tocando quando a lista acaba, emendando um rádio, como o app oficial.
 - Aparece como dispositivo no **Spotify Connect**: controle pelo celular.
-- Teclas de mídia do teclado (por enquanto só no Linux, via MPRIS).
+- Teclas de mídia do teclado: no Linux valem pelo MPRIS mesmo com a janela
+  atrás; nas outras plataformas, com a janela em foco.
 - Quatro temas de duas cores: papel, âmbar, fósforo, gameboy.
 
 ## Instalar
@@ -109,6 +112,8 @@ que confere com a chave pública embutida.
 | `enter` | abrir / tocar |
 | `b` `esc` | voltar |
 | `t` | trocar o tema |
+| `s` | modo aleatório |
+| teclas de mídia | play/pausa, faixa, volume (fn + f7/f8…) |
 | `:` | comandos (`:sobre`, `:tema`, `:topo`, `:sair`) |
 
 ## Compilar do zero
@@ -142,10 +147,10 @@ Leva dois minutos:
 2. Nome e descrição livres. Em **Redirect URIs** coloque exatamente
    `http://127.0.0.1:8898/login`. Em **APIs used** marque **Web API**.
 3. Salve, abra o app criado e copie o **Client ID**.
-4. Cole no campo **client id** da tela de login do Umbit e entre. O
-   navegador pode pedir autorização duas vezes na primeira vez: uma para o
-   seu app (biblioteca e busca) e, se o Spotify não aceitar esse token para
-   tocar música, outra para o motor de áudio.
+4. Cole no campo **client id** da tela de login do Umbit e entre. Na primeira
+   vez o navegador autoriza duas vezes: uma para o seu app (biblioteca e busca)
+   e outra para o motor de áudio (o Spotify só toca com o app dele). As duas
+   passam direto, sem erro, e nas próximas vezes não pede mais nada.
 
 Para convidar até 5 pessoas sem que elas criem um app: no painel, em
 **User Management**, adicione o e-mail da conta Spotify delas, e elas usam

@@ -61,7 +61,8 @@
 
   $effect(() => {
     const s = lib.section;
-    untrack(() => ensureLoaded(s));
+    const logged = app.session.logged_in; // recarrega quando o login termina depois da tela abrir
+    if (logged) untrack(() => ensureLoaded(s));
   });
   $effect(() => {
     if (bday && !lib.eggTracks) act('get_egg_tracks').then((t) => t && (app.library.eggTracks = t));

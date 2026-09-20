@@ -1,7 +1,7 @@
 <script>
   // tela "tocando": capa, letreiro, barra segmentada, controles, volume
   import { untrack } from 'svelte';
-  import { app, act, memo } from '../lib/state.svelte.js';
+  import { app, act, memo, toggleShuffle } from '../lib/state.svelte.js';
   import { mmss, currentPosition, artistsOf } from '../lib/format.js';
   import Cover from '../components/Cover.svelte';
   import Marquee from '../components/Marquee.svelte';
@@ -190,6 +190,9 @@
 
   <div class="controls">
     <div class="buttons">
+      <button type="button" tabindex="-1" class="ctl small" class:on={app.now.shuffle} onclick={toggleShuffle} aria-label={app.now.shuffle ? 'aleatório ligado' : 'aleatório desligado'}>
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M2 5h4l9 10h3" /><path d="M15 12l3 3-3 3" /><path d="M2 15h4l2.5-2.9" /><path d="M11.5 7.2 15 5h3" /><path d="M15 2l3 3-3 3" /></svg>
+      </button>
       <button type="button" tabindex="-1" class="ctl" onclick={() => act('prev_track')} aria-label="anterior">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 3v14" /><path d="M16 3L7 10l9 7z" /></svg>
       </button>
@@ -211,7 +214,7 @@
     </div>
   </div>
 
-  <Hints bottom items={['/ buscar', 'j k mover', 'espaço tocar', 'n p pular']} />
+  <Hints bottom items={['/ buscar', 'espaço tocar', 'n p pular', 's aleatório']} />
 </div>
 
 <style>
@@ -320,6 +323,14 @@
   .ctl.main {
     width: 56px;
     border: 0;
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .ctl.small {
+    width: 40px;
+    height: 40px;
+  }
+  .ctl.small.on {
     background: var(--ink);
     color: var(--paper);
   }
